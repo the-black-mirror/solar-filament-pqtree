@@ -1,0 +1,189 @@
+{
+ "versions": {
+  "python": "3.13.16",
+  "torch": "2.11.0+cu130",
+  "torchvision": "0.26.0+cu130",
+  "timm": "1.0.30",
+  "segmentation_models_pytorch": "0.5.0",
+  "ultralytics": "8.4.121",
+  "numpy": "2.1.3",
+  "cv2": "4.14.0",
+  "lightgbm": "4.6.0",
+  "pandas": "2.3.3",
+  "cuda_device": "Tesla T4",
+  "torch_cuda": "13.0"
+ },
+ "images": {
+  "train": [
+   "20110109104734Ch",
+   "20110114105034Ch",
+   "20110119082634Lh"
+  ],
+  "train_folds": [
+   2,
+   3,
+   4
+  ],
+  "test": [
+   "20110120105534Ch",
+   "20130609133454Bh",
+   "20160820233134Lh"
+  ]
+ },
+ "dense_maps": {
+  "seconds": 61.8,
+  "tolerance": "mean<=0.5, max<=24 (uint8 units)",
+  "oof_probs": {
+   "max_abs": 1,
+   "mean_abs": 4.307428995768229e-05
+  },
+  "test_probs": {
+   "max_abs": 1,
+   "mean_abs": 5.5631001790364586e-05
+  },
+  "oof_unc": {
+   "max_abs": 3,
+   "mean_abs": 0.00017944971720377603
+  },
+  "test_unc": {
+   "max_abs": 10,
+   "mean_abs": 0.000249783198038737
+  },
+  "oof_fam": {
+   "max_abs": 2,
+   "mean_abs": 8.972485860188802e-05
+  },
+  "test_fam": {
+   "max_abs": 2,
+   "mean_abs": 0.00010895729064941406
+  }
+ },
+ "detectors": {
+  "seconds": 141.9,
+  "rule": "per family: new count within 10 % of stored; >= 97 % of stored instances with confidence >= 0.2 have a new instance (same family, fold, image) with IoU >= 0.9; confidence difference over these matched pairs <= 0.05 (maximum)",
+  "oof/maskrcnn-1536": {
+   "stored_instances": 28,
+   "new_instances": 28,
+   "stored_conf_ge_0_2": 19,
+   "share_stored_conf_ge_0_2_matched_iou_ge_0_9": 1.0,
+   "matched_pair_max_conf_diff": 0.0005,
+   "matched_pair_mean_conf_diff": 0.0001,
+   "unmatched_stored_instances": [],
+   "matched_pairs_with_conf_diff_gt_0_05": [],
+   "ok": true
+  },
+  "oof/yolo11m-1536": {
+   "stored_instances": 37,
+   "new_instances": 38,
+   "stored_conf_ge_0_2": 17,
+   "share_stored_conf_ge_0_2_matched_iou_ge_0_9": 1.0,
+   "matched_pair_max_conf_diff": 0.0005,
+   "matched_pair_mean_conf_diff": 0.0,
+   "unmatched_stored_instances": [],
+   "matched_pairs_with_conf_diff_gt_0_05": [],
+   "ok": true
+  },
+  "oof/yolo11m-2048": {
+   "stored_instances": 50,
+   "new_instances": 50,
+   "stored_conf_ge_0_2": 22,
+   "share_stored_conf_ge_0_2_matched_iou_ge_0_9": 1.0,
+   "matched_pair_max_conf_diff": 0.001,
+   "matched_pair_mean_conf_diff": 0.0001,
+   "unmatched_stored_instances": [],
+   "matched_pairs_with_conf_diff_gt_0_05": [],
+   "ok": true
+  },
+  "oof/yolo26m-1536": {
+   "stored_instances": 35,
+   "new_instances": 35,
+   "stored_conf_ge_0_2": 17,
+   "share_stored_conf_ge_0_2_matched_iou_ge_0_9": 1.0,
+   "matched_pair_max_conf_diff": 0.002,
+   "matched_pair_mean_conf_diff": 0.0003,
+   "unmatched_stored_instances": [],
+   "matched_pairs_with_conf_diff_gt_0_05": [],
+   "ok": true
+  },
+  "test/maskrcnn-1536": {
+   "stored_instances": 162,
+   "new_instances": 162,
+   "stored_conf_ge_0_2": 86,
+   "share_stored_conf_ge_0_2_matched_iou_ge_0_9": 0.988,
+   "matched_pair_max_conf_diff": 0.4339,
+   "matched_pair_mean_conf_diff": 0.0053,
+   "unmatched_stored_instances": [
+    {
+     "image": "20130609133454Bh",
+     "fold": 2,
+     "stored_conf": 0.831,
+     "best_iou": 0.826
+    }
+   ],
+   "matched_pairs_with_conf_diff_gt_0_05": [
+    {
+     "image": "20130609133454Bh",
+     "fold": 1,
+     "stored_conf": 0.201,
+     "new_conf": 0.635,
+     "iou": 0.911
+    }
+   ],
+   "ok": false
+  },
+  "test/yolo11m-1536": {
+   "stored_instances": 220,
+   "new_instances": 220,
+   "stored_conf_ge_0_2": 125,
+   "share_stored_conf_ge_0_2_matched_iou_ge_0_9": 1.0,
+   "matched_pair_max_conf_diff": 0.001,
+   "matched_pair_mean_conf_diff": 0.0,
+   "unmatched_stored_instances": [],
+   "matched_pairs_with_conf_diff_gt_0_05": [],
+   "ok": true
+  },
+  "test/yolo11m-2048": {
+   "stored_instances": 237,
+   "new_instances": 237,
+   "stored_conf_ge_0_2": 114,
+   "share_stored_conf_ge_0_2_matched_iou_ge_0_9": 1.0,
+   "matched_pair_max_conf_diff": 0.002,
+   "matched_pair_mean_conf_diff": 0.0001,
+   "unmatched_stored_instances": [],
+   "matched_pairs_with_conf_diff_gt_0_05": [],
+   "ok": true
+  },
+  "test/yolo26m-1536": {
+   "stored_instances": 221,
+   "new_instances": 221,
+   "stored_conf_ge_0_2": 118,
+   "share_stored_conf_ge_0_2_matched_iou_ge_0_9": 1.0,
+   "matched_pair_max_conf_diff": 0.0054,
+   "matched_pair_mean_conf_diff": 0.0001,
+   "unmatched_stored_instances": [],
+   "matched_pairs_with_conf_diff_gt_0_05": [],
+   "ok": true
+  }
+ },
+ "cnn_scorer": {
+  "seconds": 5.3,
+  "tolerance": "mean<=0.01, max<=0.05",
+  "oof": {
+   "candidates": 164,
+   "max_abs": 0.00035,
+   "mean_abs": 8e-05,
+   "ok": true
+  },
+  "test": {
+   "candidates": 205,
+   "max_abs": 7e-05,
+   "mean_abs": 2e-05,
+   "ok": true
+  }
+ },
+ "verdict": {
+  "dense_maps": "PASS",
+  "detectors": "FAIL",
+  "cnn_scorer": "PASS"
+ }
+}

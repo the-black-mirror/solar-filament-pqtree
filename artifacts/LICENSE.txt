@@ -1,0 +1,4 @@
+The files in this folder (stored intermediate results and model weights of the pqtree pipeline) are released under the
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International licence (CC BY-NC-SA 4.0),
+https://creativecommons.org/licenses/by-nc-sa/4.0/ . This is the most restrictive licence among their inputs
+(see ../THIRD_PARTY.md). The code of the repository is under the MIT licence (../LICENSE).

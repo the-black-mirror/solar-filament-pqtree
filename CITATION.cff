@@ -1,0 +1,58 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite it together with the data set paper listed below."
+title: "pqtree: solar filament instance segmentation by selection on a component tree"
+authors:
+  - family-names: Sharma
+    given-names: Yuvraj
+license: MIT
+version: 1.0.0
+references:
+  - type: article
+    title: "A dataset of manually annotated filaments from H-alpha observations"
+    authors:
+      - family-names: Ahmadzadeh
+        given-names: Azim
+      - family-names: Adhyapak
+        given-names: Rohan
+      - family-names: Chaurasiya
+        given-names: Kartik
+      - family-names: Nagubandi
+        given-names: Laxmi Alekhya
+      - family-names: Aparna
+        given-names: V.
+      - family-names: Martens
+        given-names: Petrus C.
+      - family-names: Pevtsov
+        given-names: Alexei
+      - family-names: Bertello
+        given-names: Luca
+      - family-names: Pevtsov
+        given-names: Alexander
+      - family-names: Douglas
+        given-names: Naomi
+      - family-names: McDonald
+        given-names: Samuel
+      - family-names: Bawa
+        given-names: Apaar
+      - family-names: Kang
+        given-names: Eugene
+      - family-names: Wu
+        given-names: Riley
+      - family-names: Kempton
+        given-names: Dustin J.
+      - family-names: Abdelkarem
+        given-names: Aya
+      - family-names: Copeland
+        given-names: Patrick M.
+      - family-names: Seelamneni
+        given-names: Sri Harsha
+    journal: "Scientific Data"
+    volume: 11
+    pages: 1031
+    year: 2024
+    doi: "10.1038/s41597-024-03876-y"
+  - type: software
+    title: "Solar Filament Segmentation 2026 (0.40) (Kaggle notebook; source of the method description: component tree, hurdle estimate, antichain dynamic programme, tau from Dinkelbach's argument)"
+    authors:
+      - alias: tushhaaarrrr
+    url: "https://www.kaggle.com/code/tushhaaarrrr/solar-filament-segmentation-2026-0-40"

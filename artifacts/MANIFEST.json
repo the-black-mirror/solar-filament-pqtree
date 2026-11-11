@@ -1,0 +1,150 @@
+{
+ "description": "Stored intermediate results of the pipeline (stage = pipeline stage that produced the file)",
+ "total_bytes": 361594518,
+ "files": {
+  "candidates_oof.tbl.npz": {
+   "bytes": 10934186,
+   "sha256": "64159a030311c1a2f49ca2101b3d283b42c6468cff834641b634dd026b3a1630",
+   "stage": 2,
+   "description": "candidate table of the training images with features and targets"
+  },
+  "candidates_test.tbl.npz": {
+   "bytes": 2717496,
+   "sha256": "194981170836739efa29d86417c6200e4ac2dbc61f29b845eed02c0baa178695",
+   "stage": 2,
+   "description": "candidate table of the test images with features"
+  },
+  "cnn_scorer_f0.pt": {
+   "bytes": 45330195,
+   "sha256": "60f707592ac52deb2cd96eabbfc1220430f982def94a88879a67272ab0b2b2e8",
+   "stage": 3,
+   "description": "CNN scorer weights, fold 0 (state dict)"
+  },
+  "cnn_scorer_f1.pt": {
+   "bytes": 45330195,
+   "sha256": "67f1c6012ff3caa54cd0f56e9c11abd79937af1e17bc63fa8f9a06a8a5ae12db",
+   "stage": 3,
+   "description": "CNN scorer weights, fold 1 (state dict)"
+  },
+  "cnn_scorer_f2.pt": {
+   "bytes": 45330195,
+   "sha256": "7ad461609c27c3fa3b4e43fa079eba882bf4708a805fe86477be4e4855353ef9",
+   "stage": 3,
+   "description": "CNN scorer weights, fold 2 (state dict)"
+  },
+  "cnn_scorer_f3.pt": {
+   "bytes": 45330195,
+   "sha256": "01964745751c6fa8a0239b261e9bccba76cd3901c766d468d2b1c2f5bfd20250",
+   "stage": 3,
+   "description": "CNN scorer weights, fold 3 (state dict)"
+  },
+  "cnn_scorer_f4.pt": {
+   "bytes": 45330195,
+   "sha256": "83bb0d726338546ff63ba3fd9eedea0979945d17be25429d1a04c211eb3971ce",
+   "stage": 3,
+   "description": "CNN scorer weights, fold 4 (state dict)"
+  },
+  "cnn_scores_oof.csv.gz": {
+   "bytes": 469104,
+   "sha256": "d0c9a3f217d23b7aceecbae421c6be9f441c4495b206fa39e58f9d1d2e386778",
+   "stage": 3,
+   "description": "out-of-fold CNN scorer prediction per training candidate"
+  },
+  "cnn_scores_test.csv.gz": {
+   "bytes": 120793,
+   "sha256": "df11386c3c92595f71cc65a3ec7efec6a26ef58525b71f12c421ce90b8268044",
+   "stage": 3,
+   "description": "CNN scorer prediction per test candidate (mean of 5 fold models)"
+  },
+  "detector_instances_oof.csv.gz": {
+   "bytes": 5808809,
+   "sha256": "0381a9fbaf9e379ad1ee7d1d8a3f5f36c2f1c375ea144f3ab2ddb67690aaf163",
+   "stage": 4,
+   "description": "detected instances (RLE, confidence) for the training images, fold model that held the image out"
+  },
+  "detector_instances_test.csv.gz": {
+   "bytes": 7472569,
+   "sha256": "2dc7c2d055c766cafa41e335ea5cbcc031cbc3ccbaa03ae0a75e00c7d8ed62ff",
+   "stage": 4,
+   "description": "detected instances for the test images, all fold models"
+  },
+  "evidence_oof.csv.gz": {
+   "bytes": 4563358,
+   "sha256": "d6565dfdf601db733428a09f46c9b0b0a903f7c4f7523be659c27505ff942dc0",
+   "stage": 4,
+   "description": "detector evidence features per training candidate"
+  },
+  "evidence_test.csv.gz": {
+   "bytes": 1402712,
+   "sha256": "46896e03324a65406bbab5f923bbaa59fa32702e357bb5067f2d20465e028efe",
+   "stage": 4,
+   "description": "detector evidence features per test candidate"
+  },
+  "lgbm_hit.txt": {
+   "bytes": 2092999,
+   "sha256": "07ad791231d5b028da51a723625a0fe858b5a7656363b20e4d6d9ff5f782604c",
+   "stage": 5,
+   "description": "LightGBM hit model (final fit on all training candidates)"
+  },
+  "lgbm_iou.txt": {
+   "bytes": 1823644,
+   "sha256": "bf991399979fb7d93ccaebb0ca987ba66e92942f59706d8e4d213c845c41e7e5",
+   "stage": 5,
+   "description": "LightGBM matched-IoU model (final fit on all training candidates)"
+  },
+  "ngt_train.json": {
+   "bytes": 16606,
+   "sha256": "52aa0aa01e07ff689196e54c2aa81cf9c4773b6dc66eabfb4b78db3dd21f8799",
+   "stage": 2,
+   "description": "number of annotated masks per training image (all annotators)"
+  },
+  "oof_fam_unet.npz": {
+   "bytes": 20845333,
+   "sha256": "5340eccb0f58d661b8b543c69ef3ea1db9f8d5410867356333f250b0e11568a5",
+   "stage": 1,
+   "description": "out-of-fold family-gap maps, training images (uint8)"
+  },
+  "oof_probs_unet.npz": {
+   "bytes": 19903560,
+   "sha256": "d2f21bd2f2c1fd150fa29208376938002588da3a558337fe67b94c924e9c890e",
+   "stage": 1,
+   "description": "out-of-fold probability maps of the 707 training images (uint8)"
+  },
+  "oof_scores.csv.gz": {
+   "bytes": 1851501,
+   "sha256": "2bcaed4bda54ffa3567fbb126af10f88c0fc93f9a9b10faaddb73b059efa6e6b",
+   "stage": 5,
+   "description": "out-of-fold LightGBM scores of the training candidates, three cross-fitting shuffles"
+  },
+  "oof_unc_unet.npz": {
+   "bytes": 21478812,
+   "sha256": "2a8de3459fedeab36aeeddce73450c083c57361a1ad43d9925283df70fd6c580",
+   "stage": 1,
+   "description": "out-of-fold view-uncertainty maps, training images (uint8)"
+  },
+  "test_components.npz": {
+   "bytes": 15731697,
+   "sha256": "9056e5e9a69d2465ccfc752a21648a53cc6a4ddd13e73380b3dccc30f16312f7",
+   "stage": 2,
+   "description": "component label images of the test-image probability maps at the eight levels (uint16; model output)"
+  },
+  "test_fam_unet.npz": {
+   "bytes": 5274979,
+   "sha256": "1e7e94b7e704a43014947d9942466ffb0babc3edc7d28e323a892d47ce69bc2d",
+   "stage": 1,
+   "description": "family-gap maps, test images (uint8)"
+  },
+  "test_probs_unet.npz": {
+   "bytes": 5558115,
+   "sha256": "66343b607f666add7e26f31b692f8e45ed603af8918659a92713552aa77c9328",
+   "stage": 1,
+   "description": "probability maps of the 180 test images, mean of 10 models (uint8)"
+  },
+  "test_unc_unet.npz": {
+   "bytes": 6877270,
+   "sha256": "1742c5ab0fc465d55a22b52447f9ef9a3459214452ec5fc8dac65d101c23e0a6",
+   "stage": 1,
+   "description": "view-uncertainty maps, test images (uint8)"
+  }
+ }
+}
