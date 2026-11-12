@@ -1,7 +1,9 @@
-"""Small figures for the notebook: dense map, candidates at several thresholds, selected instances, annotator outlines.
+"""Small figures for the notebook: dense map, candidates at several thresholds, selected instances, annotator outlines,
+a gallery of test images and a full-disk view.
 
-All functions take 2048 x 2048 arrays and draw a square crop (``box = (y0, y1, x0, x1)``). The H-alpha image is optional;
-without it the probability map is used as background.
+All functions take 2048 x 2048 arrays and, except :func:`full_disk_figure`, draw a square crop
+(``box = (y0, y1, x0, x1)``). The H-alpha image is optional in the single-crop figures; without it the probability map is
+used as background. The gallery and the full-disk view need the image.
 """
 from __future__ import annotations
 
@@ -104,6 +106,41 @@ def annotator_figure(prob: np.ndarray, masks: Sequence[np.ndarray], annotator_ma
             if c.any() and not c.all():
                 ax.contour(c.astype(float), levels=[0.5], colors=[palette[a % 3]], linewidths=1.2, linestyles="dashed")
     ax.set_title(title + "  red: selected, dashed: annotators")
+    fig.tight_layout()
+    _credit(fig, img)
+    return fig
+
+
+def gallery_figure(panels: Sequence[tuple[str, np.ndarray, Sequence[np.ndarray], tuple[int, int, int, int]]], ncols: int = 4):
+    """Grid of square crops of H-alpha images with every selected instance outlined in its own colour.
+
+    Each panel is ``(image id, grey image, full-size boolean masks of all selected instances of that image, box)``; the
+    title gives the image id and the number of selected instances in the whole image (also those outside the crop).
+    """
+    nrows = -(-len(panels) // ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(14, 3.75 * nrows))
+    axes = np.atleast_1d(axes).ravel()
+    for ax, (stem, img, masks, box) in zip(axes, panels):
+        _background(ax, img, img, box)
+        for j, m in enumerate(masks):
+            _outline(ax, _crop(m, box), COLORS[j % len(COLORS)], 1.2)
+        ax.set_title(f"{stem}: {len(masks)} instance{'' if len(masks) == 1 else 's'}", fontsize=8.5)
+    for ax in axes[len(panels):]:
+        ax.axis("off")
+    fig.tight_layout(h_pad=2.0)
+    _credit(fig, panels[0][1] if panels else None)
+    return fig
+
+
+def full_disk_figure(img: np.ndarray, masks: Sequence[np.ndarray], title: str = ""):
+    """One whole image with every selected instance (full-size boolean masks) outlined in its own colour."""
+    fig, ax = plt.subplots(figsize=(9, 9))
+    ax.imshow(img, cmap="gray")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for j, m in enumerate(masks):
+        _outline(ax, m, COLORS[j % len(COLORS)], 1.0)
+    ax.set_title(title)
     fig.tight_layout()
     _credit(fig, img)
     return fig

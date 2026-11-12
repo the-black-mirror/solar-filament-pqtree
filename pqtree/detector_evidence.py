@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 from pycocotools import mask as mu
 
-from .config import FAMILIES, H, LEVELS, W
+from .config import DETECTOR_DATASET, FAMILIES, H, LEVELS, N_TRAIN_IMAGES, W
 
 CONF = 0.05
 MAX_DET = 80
@@ -130,7 +130,8 @@ def _load_maskrcnn(path: str, device):
     mdl.roi_heads.box_predictor = FastRCNNPredictor(mdl.roi_heads.box_predictor.cls_score.in_features, 2)
     mdl.roi_heads.mask_predictor = MaskRCNNPredictor(mdl.roi_heads.mask_predictor.conv5_mask.in_channels, 256, 2)
     res = mdl.load_state_dict(sd, strict=False)
-    assert len(res.missing_keys) == 0, "state dict does not match torchvision maskrcnn_resnet50_fpn_v2"
+    if res.missing_keys:
+        raise RuntimeError("state dict does not match torchvision maskrcnn_resnet50_fpn_v2")
     return mdl.to(device).eval()
 
 
@@ -167,12 +168,17 @@ def run_detectors(weights_dir: str | os.PathLike, train_dir: str | os.PathLike, 
     device = torch.device("cuda")
     wd, out = Path(weights_dir), Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    if not (wd / "manifest.json").exists():
+        raise FileNotFoundError(f"{wd / 'manifest.json'} not found: the detector weights are not part of this repository; "
+                                f"download the public Kaggle dataset {DETECTOR_DATASET} and set PQTREE_DETECTOR_WEIGHTS to its folder")
     man = json.load(open(wd / "manifest.json"))
     folds = pd.read_csv(wd / "splits" / "folds.csv")
     fold_of = dict(zip(folds.image_stem, folds.fold))
     all_test = sorted(p[:-5] for p in os.listdir(test_dir) if p.endswith(".jpeg"))
     train_stems = sorted(fold_of)
-    assert len(train_stems) == 707 and not (set(train_stems) & set(all_test))
+    if len(train_stems) != N_TRAIN_IMAGES or set(train_stems) & set(all_test):
+        raise ValueError(f"expected {N_TRAIN_IMAGES} training images in folds.csv, none of them among the test images; "
+                         f"got {len(train_stems)} with {len(set(train_stems) & set(all_test))} in the test folder")
     test_use = list(test_stems) if test_stems is not None else all_test
     oof_use = set(oof_stems) if oof_stems is not None else set(train_stems)
     runs = {(m["family"], m["fold"]): m["run"] for m in man["models"]}

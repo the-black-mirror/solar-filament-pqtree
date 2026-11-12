@@ -17,7 +17,7 @@ from .artifacts import fetch_artifact, load_table
 from .config import TAU
 
 
-def test_features(artifact_dir=None) -> pd.DataFrame:
+def build_test_table(artifact_dir=None) -> pd.DataFrame:
     """Candidate table of the test images with all model inputs attached (stages 2-4 from the artefacts)."""
     cands = load_table(fetch_artifact("candidates_test.tbl.npz", artifact_dir))
     cnn = pd.read_csv(fetch_artifact("cnn_scores_test.csv.gz", artifact_dir))
@@ -27,7 +27,7 @@ def test_features(artifact_dir=None) -> pd.DataFrame:
 
 def default_submission(out_path: str | Path, artifact_dir=None, tau: float = TAU) -> pd.DataFrame:
     """Write the submission CSV from the stored artefacts and return it."""
-    te = test_features(artifact_dir)
+    te = build_test_table(artifact_dir)
     model = lgbm_scorer.HurdleModel.load(fetch_artifact(lgbm_scorer.HIT_FILE, artifact_dir),
                                          fetch_artifact(lgbm_scorer.IOU_FILE, artifact_dir))
     score = model.predict(te)

@@ -5,6 +5,7 @@ authors:
   - family-names: Sharma
     given-names: Yuvraj
 license: MIT
+repository-code: "https://github.com/the-black-mirror/solar-filament-pqtree"
 version: 1.0.0
 references:
   - type: article

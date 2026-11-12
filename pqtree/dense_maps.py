@@ -15,7 +15,6 @@ All maps are stored as uint8 (probability x 255).
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import threading
@@ -26,7 +25,8 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from .config import DISK_RADIUS, H, W
+from .artifacts import sha256_file
+from .config import DISK_RADIUS, H, N_TRAIN_IMAGES, UNET_DATASET, W
 
 # (number of 90-degree rotations, horizontal flip applied first) for the eight dihedral views, in the order used
 # when the ensemble was trained and published.
@@ -36,14 +36,6 @@ D4 = [(0, False), (0, True), (2, False), (2, True), (1, False), (1, True), (3, F
 def _disk_mask() -> np.ndarray:
     yy, xx = np.ogrid[:H, :W]
     return ((yy - (H - 1) / 2.0) ** 2 + (xx - (W - 1) / 2.0) ** 2) <= DISK_RADIUS ** 2
-
-
-def _sha256(path: str) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for c in iter(lambda: f.read(1 << 22), b""):
-            h.update(c)
-    return h.hexdigest()
 
 
 def predict_image(model, img_u8: np.ndarray, device, disk: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -102,13 +94,18 @@ def compute_dense_maps(weights_dir: str | os.PathLike, train_dir: str | os.PathL
     wd, out = Path(weights_dir), Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     disk = _disk_mask()
+    if not (wd / "solar_unet_receipt.json").exists():
+        raise FileNotFoundError(f"{wd / 'solar_unet_receipt.json'} not found: the U-Net weights are not part of this repository; "
+                                f"download the public Kaggle dataset {UNET_DATASET} and set PQTREE_UNET_WEIGHTS to its folder")
     receipt = json.load(open(wd / "solar_unet_receipt.json"))
     models = receipt["ensemble"]["models"]
     folds = pd.read_csv(wd / "folds.csv")
     fold_of = dict(zip(folds.stem, folds.fold))
     test_stems = sorted(p[:-5] for p in os.listdir(test_dir) if p.endswith(".jpeg"))
     train_stems = sorted(fold_of)
-    assert len(train_stems) == 707 and not (set(train_stems) & set(test_stems))
+    if len(train_stems) != N_TRAIN_IMAGES or set(train_stems) & set(test_stems):
+        raise ValueError(f"expected {N_TRAIN_IMAGES} training images in folds.csv, none of them among the test images; "
+                         f"got {len(train_stems)} with {len(set(train_stems) & set(test_stems))} in the test folder")
     if train_subset is not None:
         train_stems = [s for s in train_stems if s in set(train_subset)]
     if test_subset is not None:
@@ -131,7 +128,8 @@ def compute_dense_maps(weights_dir: str | os.PathLike, train_dir: str | os.PathL
                     return
                 m = todo.pop(0)
             try:
-                assert _sha256(str(wd / m["file"])) == m["sha256"], m["file"]
+                if sha256_file(wd / m["file"]) != m["sha256"]:
+                    raise RuntimeError(f"checksum mismatch for {m['file']}")
                 model = smp.Unet(encoder_name=m["encoder"], encoder_weights=None, in_channels=1, classes=1)
                 model.load_state_dict(torch.load(wd / m["file"], map_location="cpu", weights_only=True))
                 model = model.to(device).to(memory_format=torch.channels_last).eval()
@@ -161,7 +159,8 @@ def compute_dense_maps(weights_dir: str | os.PathLike, train_dir: str | os.PathL
         th.start()
     for th in threads:
         th.join()
-    assert not errors, errors
+    if errors:
+        raise RuntimeError("; ".join(errors))
 
     oof_p, oof_u, oof_g = {}, {}, {}
     for s in train_stems:

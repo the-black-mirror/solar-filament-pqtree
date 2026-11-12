@@ -1,7 +1,7 @@
 """Reproduction test: the stored-artefact path must write exactly the reference submission.
 
-Needs the artefacts (see README); set PQTREE_ARTIFACTS if they are not in ./artifacts. Skipped if they are missing and
-cannot be downloaded.
+Needs the artefacts (see README); set PQTREE_ARTIFACTS if they are not in ./artifacts. Skipped if artifacts/MANIFEST.json
+is missing (incomplete clone).
 """
 import sys
 from pathlib import Path

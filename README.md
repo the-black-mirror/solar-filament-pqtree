@@ -11,15 +11,17 @@ selects the set of non-overlapping candidates that maximises the sum of (predict
 one run-length-encoded mask per kept candidate. The component tree, the hurdle estimate of the matched IoU, the exact
 dynamic programme and the use of a single global threshold follow the public notebook of tushhaaarrrr (see
 `THIRD_PARTY.md`); the candidate descriptors, the CNN scorer, the detector-agreement features and this code were written for this project.
+The idea of ensemble-disagreement descriptors also appears in that notebook; the implementation here (view-spread and
+encoder-gap maps) is ours.
 
 The reference submission is `reference/submission.csv` (1010 instances in 180 test images). One command or one notebook
 reproduces it exactly, without GPU and without retraining.
 
 ## Quick start (CPU only, fresh clone)
 
-The repository contains everything the notebook loads, including the model weights and the stored stage outputs
-(`artifacts/`, about 360 MB, plain git files, no download step). The clone is large because the five CNN scorer weight
-files (227 MB) and the stored maps and component images (96 MB) are part of it: the host requires weights to be stored in the repository.
+The repository contains everything the notebook loads by default, including the weights of our own models and the stored
+stage outputs (`artifacts/`, about 360 MB, plain git files, no download step). The clone is large because the five CNN scorer weight
+files (227 MB) and the stored maps and component images (96 MB) are part of it, so that the weights are in the repository and the notebook loads them.
 
 ```bash
 pip install -r requirements.txt                  # exact versions, Python 3.11
@@ -36,8 +38,20 @@ checking its sha256 against the manifest. If a file is missing it raises an erro
 
 Optional inputs of the notebook (environment variables): the competition folder (`PQTREE_COMPETITION_DIR`, with
 `train/train_images` and `test/test_images`) and the training annotation file (`PQTREE_TRAIN_JSON`). Without them the
-pictures and the exact out-of-fold evaluation of stage 7 are skipped; everything else runs. The repository contains no
-competition image files and no annotation file (see "Data, labels and licences").
+pictures and the exact out-of-fold evaluation of stage 7 are skipped; everything else runs, and the stored outputs of the
+notebook show the pictures and the evaluation. The repository contains no competition image files and no annotation file
+(see "Data, labels and licences").
+
+## Model weights
+
+| model | where | how the notebook uses it |
+|---|---|---|
+| LightGBM hit and IoU models | `artifacts/lgbm_hit.txt`, `artifacts/lgbm_iou.txt` | loaded and applied in stage 5 (default path) |
+| CNN crop scorer, 5 fold models | `artifacts/cnn_scorer_f0.pt` ... `f4.pt` | their stored test scores are read by default; `APPLY_STORED_CNN_WEIGHTS = True` loads the weights and re-scores the test crops (needs torch, timm and the competition images) |
+| dense U-Nets (third party, CC BY-NC-SA 4.0) | not redistributed; public Kaggle dataset `dariushafshar/solar-filament-unet-weights` (`THIRD_PARTY.md`) | their stored maps are read by default; `RECOMPUTE_MAPS = True` re-runs them from the dataset |
+| detectors (third party, AGPL-3.0) | not redistributed; public Kaggle dataset `notoverkil/solar-filament-weights` (`THIRD_PARTY.md`) | their stored instances are read by default; `RECOMPUTE_DETECTIONS = True` re-runs them from the dataset |
+
+The submitted CSV is reproduced from the stored outputs without any file from outside the repository.
 
 ## Pipeline
 
@@ -70,11 +84,10 @@ result of the GPU check is in the next section.
 
 ### GPU stage check
 
-`tools/gpu_stage_check.py` was run twice in a Kaggle GPU session (Tesla T4; Python 3.13.16, torch 2.11.0+cu130, torchvision
-0.26.0+cu130, timm 1.0.30, segmentation_models_pytorch 0.5.0, ultralytics 8.4.121, numpy 2.1.3, OpenCV 4.14.0, pandas 2.3.3,
-LightGBM 4.6.0), with the same outcome both times. The second run used the current version of the script and is stored in
-full as `tools/gpu_stage_check_result.json`. It re-ran the packaged stages on 3 test images and 3 training images (folds
-2, 3, 4) and compared them with the stored results.
+`tools/gpu_stage_check.py` re-ran the packaged stages on 3 test and 3 training images in a Kaggle GPU session (Tesla T4; Python 3.13, torch 2.11.0, timm 1.0.30, ultralytics 8.4.121) and compared them with the stored results.
+Two runs gave the same outcome; the table is the second run: dense maps, CNN scorer and 7 of 8 detector rows pass, the test Mask R-CNN row fails.
+The failing row comes from two instances in image 20130609133454Bh (a confidence of 0.201 against 0.635 in one matched pair, and one stored instance with best new IoU 0.826).
+The full record is `tools/gpu_stage_check_result.json`; the tolerances are stated in the script. The stored detections are the ones the pipeline uses.
 
 | stage | measured (second run) | verdict |
 |---|---|---|
@@ -82,14 +95,6 @@ full as `tools/gpu_stage_check_result.json`. It re-ran the packaged stages on 3 
 | CNN scorer (stored weights, 164 training and 205 test candidates) | max abs difference 0.00035 (training images) and 0.00007 (test images); mean 8e-5 and 2e-5 | PASS |
 | detectors, 7 of 8 family/split rows (training images: Mask R-CNN, YOLO11m 1536, YOLO11m 2048, YOLO26m; test images: YOLO11m 1536, YOLO11m 2048, YOLO26m) | 100 % of the stored instances with confidence >= 0.2 have a new instance at IoU >= 0.9; confidence differences of these pairs <= 0.0054; instance counts equal, except 37 stored against 38 new (YOLO11m 1536, training images) | PASS |
 | detectors, test images, Mask R-CNN 1536 | 162 stored and 162 new instances; 85 of 86 stored instances with confidence >= 0.2 matched (98.8 %); largest confidence difference of a matched pair 0.4339, mean 0.0053 | **FAIL (outside the rule)** |
-
-The detector rule: per family and split, the new instance count is within 10 % of the stored count, at least 97 % of the
-stored instances with confidence >= 0.2 have a new instance at IoU >= 0.9 (same family, fold and image), and the maximum
-confidence difference over these matched pairs is <= 0.05. The test Mask R-CNN row is outside the rule because of two
-instances in image 20130609133454Bh: a matched pair (fold 1, IoU 0.911) whose confidence is 0.201 in the stored run and 0.635
-in the new run, and a stored instance (fold 2, confidence 0.831) whose best new instance has IoU 0.826. The rule was not
-changed to accept the row. The stored detections are the ones used by the pipeline; this stage only feeds the evidence
-features of stage 4b.
 
 ### Third-party models used by the recompute path
 
@@ -129,7 +134,7 @@ pairs; pooled PQ). Public leaderboard values are those displayed by the competit
 |---|---|---|
 | dense maps + plain keep rule | 0.4523 | 0.39 |
 | + component tree + hurdle LightGBM + CNN scorer | 0.4570 | 0.39 |
-| **+ detector evidence (this submission, tau 0.34)** | **0.4625** (3 cross-fitting shuffles: 0.4608, 0.4628, 0.4640) | **0.41** |
+| **+ detector evidence (this submission, tau 0.34)** | **0.4625** mean of three cross-fitting shuffles (0.4608, 0.4628, 0.4640); exact evaluation of shuffle 0: 0.4609 | **0.41** |
 | agreement between two annotators (reference) | 0.339 | - |
 
 The exact evaluation of `notebooks/pipeline.ipynb` (stage 7) gives for shuffle 0: PQ 0.4609, SQ 0.6914, RQ 0.6666 (TP 4899,
@@ -153,12 +158,26 @@ notebook):
 | overlap (IoU > 0) | 140 (1.7 %) | 137 (2.1 %) | 2320 | 612 |
 | half area | 132 (1.6 %) | 123 (1.9 %) | 2686 | 1199 |
 
+## Statistics of the report
+
+```bash
+python tools/report_statistics.py --train-json /path/to/MAGFiLO_1.0_Annotations_kaggle2026_train.json   # or set PQTREE_TRAIN_JSON
+```
+
+The script selects the instances for cross-fitting shuffle 0 at `config.TAU` from the stored out-of-fold artefacts, scores
+them against every annotator and prints the evaluation statistics of the report (pooled PQ, SQ, RQ and TP / FP / FN with
+bootstrap intervals, PQ per group of annotation batches, PQ per annotator-image, IoU and Dice of the matched pairs,
+relation degrees, morphology of kept and annotated masks, the three-shuffle mean PQ at tau 0.26, 0.30 and 0.34) and writes
+them to `outputs/report_statistics.json`. It needs the artefacts and the training annotation file of the competition (no
+image files) and takes about 5 minutes on 3 CPU cores.
+
 ## Hardware, run time, reproducibility
 
 | path | hardware | time |
 |---|---|---|
 | `python -m pqtree.pipeline` (stored artefacts) | CPU, 4 cores, 0.3 GB peak RAM | about 1 min |
-| `notebooks/pipeline.ipynb`, all switches `False` | CPU, 3-4 cores, 0.8 GB peak RAM | about 6 min measured with 3 cores (13 min on a shared machine); the exact evaluation of stage 7 takes most of it |
+| `notebooks/pipeline.ipynb`, all switches `False`, without the competition data | CPU, 3-4 cores, 0.5 GB peak RAM | about 2 min |
+| `notebooks/pipeline.ipynb`, all switches `False`, with the competition folder and the annotation file | CPU, 3-4 cores, 1.6 GB peak RAM | about 6 to 8 min (5.5 min measured with 3 cores); the exact evaluation of stage 7 takes most of it |
 | `REFIT_LGBM = True` | CPU | about 15 min (final fit 1 min; three cross-fitting shuffles 4.5 min each) |
 | `RECOMPUTE_EVIDENCE = True` | CPU | about 55 min |
 | `RECOMPUTE_MAPS = True` | 2 x GPU (Tesla T4 class) | about 40 min |
@@ -178,7 +197,7 @@ Competition data: Ahmadzadeh et al., *A dataset of manually annotated filaments 
 https://kaggle.com/competitions/filament-segmentation-2026. This work uses GONG data obtained by the NSO Integrated
 Synoptic Program, managed by the National Solar Observatory (AURA, NSF), with contributions from NOAA.
 
-The repository contains no competition image files, no annotation file, and no polygons or masks of the annotators. The executed notebook shows a few small illustrative crops (H-alpha images from the GONG network, NSO; MAGFiLO annotation outlines; CC BY-NC 4.0, non-commercial use, credit as in the data reference above). Label-derived
+The repository contains no competition image files, no annotation file, and no polygons or masks of the annotators. The executed notebook shows crops and one complete image of H-alpha test images with our predicted outlines (one crop in three figures, a gallery of eight crops, one complete image) and one training crop with the annotators' outlines (H-alpha images from the GONG network, NSO; MAGFiLO annotation outlines; CC BY-NC 4.0, non-commercial use, credit as in the data reference above). Label-derived
 content is limited to: the columns `u`, `h`, `m` and `nann` of the training candidate table
 (`artifacts/candidates_oof.tbl.npz`: mean matched IoU, share of annotators with a match, mean IoU of the matching
 annotators and number of annotators, all aggregated over the annotators of an image) and the number of annotated masks per
@@ -193,10 +212,16 @@ restrictive licence among their inputs. Pre-trained models and software are list
 ```
 pqtree/                   package, one module per stage (see the table above)
 notebooks/pipeline.ipynb  the walk-through with all switches (stored with its outputs)
-tests/                    unit tests (selection, PQ, relations) and the reproduction test
+tests/                    unit tests (selection, PQ, relations, components, statistics) and the reproduction test
+  test_components.py      tests of the candidate tree, the targets, the submission checks, the artefact access and the LightGBM model
 tools/gpu_stage_check.py  comparison of the packaged GPU stages with the stored results
 tools/gpu_stage_check_result.json  output of that check on a Kaggle T4 (second run)
+tools/report_statistics.py  the evaluation statistics of the report, recomputed from the artefacts
 reference/submission.csv  the reference submission (sha256 above)
-artifacts/                weights and stored stage outputs, MANIFEST.json lists name, size, sha256 and stage
+artifacts/                weights and stored stage outputs
+  MANIFEST.json           name, size, sha256 and stage of every artefact
+  LICENSE.txt             licence of the artefacts
+pyproject.toml            package metadata (`pip install -e .` is optional)
+.gitattributes            files are stored byte for byte so that the checksums hold
 requirements.txt, requirements-gpu.txt, THIRD_PARTY.md, LICENSE, CITATION.cff
 ```

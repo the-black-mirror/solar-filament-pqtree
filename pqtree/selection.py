@@ -131,16 +131,23 @@ def write_submission(rows: list[tuple[str, str]], path: str | os.PathLike) -> pd
 
 
 def validate_submission(path: str | os.PathLike, n_images: Optional[int] = None) -> str:
-    """Check the file format: columns, unique ids, no empty mask, masks of one image pixel-disjoint."""
+    """Check the file format: columns, unique ids, no empty mask, masks of one image pixel-disjoint.
+
+    Raises ``ValueError`` with the first problem found; returns a one-line summary if the file is valid.
+    """
     df = pd.read_csv(path)
-    assert list(df.columns) == ["filament_id", "segmentation_rle"], list(df.columns)
-    assert df.filament_id.is_unique, "duplicate ids"
+    if list(df.columns) != ["filament_id", "segmentation_rle"]:
+        raise ValueError(f"unexpected columns {list(df.columns)}")
+    if not df.filament_id.is_unique:
+        raise ValueError("duplicate ids")
     stems = df.filament_id.str.rsplit("_", n=1).str[0]
-    if n_images is not None:
-        assert stems.nunique() == n_images, stems.nunique()
+    if n_images is not None and stems.nunique() != n_images:
+        raise ValueError(f"{stems.nunique()} images, expected {n_images}")
     for s, g in df.groupby(stems):
         rles = [{"size": [H, W], "counts": r.encode("ascii")} for r in g.segmentation_rle]
         areas = mu.area(rles)
-        assert (areas > 0).all(), f"empty mask in {s}"
-        assert mu.area(mu.merge(rles)) == areas.sum(), f"overlapping masks in {s}"   # disjoint iff union area = sum of areas
+        if not (areas > 0).all():
+            raise ValueError(f"empty mask in {s}")
+        if mu.area(mu.merge(rles)) != areas.sum():   # disjoint iff union area = sum of areas
+            raise ValueError(f"overlapping masks in {s}")
     return f"valid: {len(df)} rows, {stems.nunique()} images, ids unique, no empty masks, masks disjoint"

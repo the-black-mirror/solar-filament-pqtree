@@ -13,6 +13,9 @@ MIN_AREA = 30
 TAU = 0.34
 """Selection threshold of the final model: a candidate is kept only if its predicted matched IoU exceeds it."""
 
+N_TRAIN_IMAGES = 707
+"""Number of training images of the competition (every one of them is scored out-of-fold)."""
+
 DISK_RADIUS = 950
 """Radius (pixels) of the solar disk used for intensity normalisation in the dense-map stage."""
 
@@ -56,4 +59,6 @@ CNN_CONFIG = dict(backbone="resnet18", size=128, epochs=8, batch_size=256, lr=1e
 
 # --- third-party model weights on Kaggle (read-only inputs of the recompute path) ----------------------------------
 UNET_DATASET = "dariushafshar/solar-filament-unet-weights"
+"""Public Kaggle dataset with the U-Net fold models (named in the error message of the dense-map stage)."""
 DETECTOR_DATASET = "notoverkil/solar-filament-weights"
+"""Public Kaggle dataset with the detector fold models (named in the error message of the detector stage)."""
