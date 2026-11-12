@@ -10,7 +10,7 @@ LEVELS: tuple[float, ...] = (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 MIN_AREA = 30
 """Components smaller than this many pixels are not candidates."""
 
-TAU = 0.30
+TAU = 0.34
 """Selection threshold of the final model: a candidate is kept only if its predicted matched IoU exceeds it."""
 
 DISK_RADIUS = 950

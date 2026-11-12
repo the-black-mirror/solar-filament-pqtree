@@ -16,7 +16,7 @@ from pqtree import pipeline  # noqa: E402
 from pqtree.artifacts import ARTIFACT_DIR  # noqa: E402
 
 REFERENCE = ROOT / "reference" / "submission.csv"
-REFERENCE_SHA256 = "0d277cfceb562591a8562a163bdb026007da084de9d5b77fea3023353adaef29"
+REFERENCE_SHA256 = "eab570adfc6309f73db548636041f1dbb8ebb867652dcb90f8fd43ed74b4953a"
 
 
 @pytest.mark.skipif(not (ARTIFACT_DIR / "MANIFEST.json").exists(), reason="artefacts not available")

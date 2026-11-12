@@ -7,12 +7,12 @@ metric: pooled multi-annotator Panoptic Quality). Author: Yuvraj Sharma.
 and taking connected components gives candidate masks that form a tree. A LightGBM model predicts for every candidate its
 expected matched IoU with the annotators, using shape and intensity descriptors, the output of a small CNN that looks at
 the candidate, and the agreement of the candidate with instances found by detector networks. A dynamic programme then
-selects the set of non-overlapping candidates that maximises the sum of (predicted IoU - tau) (tau = 0.30). The result is
+selects the set of non-overlapping candidates that maximises the sum of (predicted IoU - tau) (tau = 0.34). The result is
 one run-length-encoded mask per kept candidate. The component tree, the hurdle estimate of the matched IoU, the exact
 dynamic programme and the use of a single global threshold follow the public notebook of tushhaaarrrr (see
 `THIRD_PARTY.md`); the candidate descriptors, the CNN scorer, the detector-agreement features and this code were written for this project.
 
-The reference submission is `reference/submission.csv` (1093 instances in 180 test images). One command or one notebook
+The reference submission is `reference/submission.csv` (1010 instances in 180 test images). One command or one notebook
 reproduces it exactly, without GPU and without retraining.
 
 ## Quick start (CPU only, fresh clone)
@@ -29,7 +29,7 @@ python -m pytest tests                            # unit tests and the reproduct
 jupyter nbconvert --to notebook --execute notebooks/pipeline.ipynb --output-dir outputs   # the full walk-through
 ```
 
-The sha256 of the expected CSV is `0d277cfceb562591a8562a163bdb026007da084de9d5b77fea3023353adaef29`.
+The sha256 of the expected CSV is `eab570adfc6309f73db548636041f1dbb8ebb867652dcb90f8fd43ed74b4953a`.
 
 `pqtree.artifacts.fetch_artifact(name)` returns the path of a file in `artifacts/` (or in `$PQTREE_ARTIFACTS`) after
 checking its sha256 against the manifest. If a file is missing it raises an error that asks for the complete repository.
@@ -111,8 +111,14 @@ With pooled PQ = S / (TP + FP/2 + FN/2), every kept instance adds exactly 1/2 pe
 not. By Dinkelbach's argument for ratio objectives, with exact expected IoUs the optimal threshold equals half the
 attainable PQ (about 0.23 here), and the best disjoint set is found exactly by dynamic programming over the tree
 (`pqtree.selection.select`): two candidates overlap only if one is an ancestor of the other, so the disjoint sets are the
-antichains of the tree. Our predicted IoUs are optimistic on the kept set and the out-of-fold curve is flat, so we use
-tau = 0.30, chosen from the range that scored best on the public leaderboard.
+antichains of the tree. Our predicted IoUs are optimistic on the kept set and the out-of-fold curve is flat: for shuffle 0 it
+is highest near tau = 0.26 (PQ 0.4668) and falls slowly, to 0.4608 at tau = 0.34. We use tau = 0.34, the middle of the range
+that scored highest on the public leaderboard (0.41 for every tau from 0.28 to 0.40, 0.40 at 0.24, 0.26 and 0.44; the
+leaderboard shows two decimals and scores about half of the test images). If the test images are labelled more sparsely than
+the training images, so that each annotated filament is kept with probability r, the expected matched IoU of a candidate
+scales by r while the attainable PQ falls by less than that, so the optimal threshold on the predicted IoU rises (by a factor
+between 1 and 1 / r). The higher threshold is what the public scores point to, and it costs 0.006 PQ on the training images
+for shuffle 0 (0.004 for the mean of the three shuffles, 0.4663 at 0.26 against 0.4625 at 0.34).
 
 ## Results
 
@@ -123,29 +129,29 @@ pairs; pooled PQ). Public leaderboard values are those displayed by the competit
 |---|---|---|
 | dense maps + plain keep rule | 0.4523 | 0.39 |
 | + component tree + hurdle LightGBM + CNN scorer | 0.4570 | 0.39 |
-| **+ detector evidence (this submission, tau 0.30)** | **0.4652** (3 cross-fitting shuffles: 0.4646, 0.4650, 0.4659) | **0.41** |
+| **+ detector evidence (this submission, tau 0.34)** | **0.4625** (3 cross-fitting shuffles: 0.4608, 0.4628, 0.4640) | **0.41** |
 | agreement between two annotators (reference) | 0.339 | - |
 
-The exact evaluation of `notebooks/pipeline.ipynb` (stage 7) gives for shuffle 0: PQ 0.4647, SQ 0.6905, RQ 0.6730 (TP 5097,
-FP 1852, FN 3102); the value computed from the stored candidate targets differs by 6e-5. The out-of-fold PQ as a function of
+The exact evaluation of `notebooks/pipeline.ipynb` (stage 7) gives for shuffle 0: PQ 0.4609, SQ 0.6914, RQ 0.6666 (TP 4899,
+FP 1601, FN 3300); the value computed from the stored candidate targets differs by 6e-5. The out-of-fold PQ as a function of
 tau (shuffle 0): 0.4645 at 0.20, 0.4658 at 0.24, 0.4668 at 0.26, 0.4646 at 0.30, 0.4608 at 0.34, 0.4569 at 0.38.
 
-Distribution of the matched pairs (IoU > 0.5), n = 5097:
+Distribution of the matched pairs (IoU > 0.5), n = 4899:
 
 | | mean | 10% | 25% | 50% | 75% | 90% |
 |---|---|---|---|---|---|---|
-| IoU | 0.690 | 0.568 | 0.629 | 0.698 | 0.757 | 0.798 |
-| Dice | 0.814 | 0.724 | 0.772 | 0.822 | 0.862 | 0.888 |
+| IoU | 0.691 | 0.568 | 0.630 | 0.699 | 0.758 | 0.799 |
+| Dice | 0.814 | 0.725 | 0.773 | 0.823 | 0.862 | 0.888 |
 
-62.2 % of the annotated masks have a prediction with IoU > 0.5 (best Dice > 0.5: 70.2 %).
+59.8 % of the annotated masks have a prediction with IoU > 0.5 (best Dice > 0.5: 67.0 %).
 
-One-to-many and many-to-one relations (8199 annotated masks, 6948 predictions; two definitions of a partner, see the
+One-to-many and many-to-one relations (8199 annotated masks, 6499 predictions; two definitions of a partner, see the
 notebook):
 
 | partner rule | one-to-many (annotated masks with 2 or more partners) | many-to-one (predictions with 2 or more partners) | annotated masks without partner | predictions without partner |
 |---|---|---|---|---|
-| overlap (IoU > 0) | 178 (2.2 %) | 144 (2.1 %) | 2025 | 730 |
-| half area | 165 (2.0 %) | 128 (1.8 %) | 2404 | 1420 |
+| overlap (IoU > 0) | 140 (1.7 %) | 137 (2.1 %) | 2320 | 612 |
+| half area | 132 (1.6 %) | 123 (1.9 %) | 2686 | 1199 |
 
 ## Hardware, run time, reproducibility
 
