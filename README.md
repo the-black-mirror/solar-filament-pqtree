@@ -51,7 +51,7 @@ encoder-gap maps) is ours.
 <img src="docs/media/pipeline.svg" width="100%" alt="The six stages of the pipeline: dense maps, component tree, CNN scorer, detector evidence, hurdle LightGBM, antichain selection.">
 
 The heart of the method is a choice between nested candidates. The animation follows one filament region of a test image
-from the probability map to the kept instances; every outline, node and score in it is read from the stored artefacts.
+from the probability map to the kept instances; every outline, node and score in it is computed from the stored artefacts.
 
 <img src="docs/media/component_tree.gif" width="100%" alt="One region of a test image: probability map, components at eight thresholds forming a tree, a predicted matched IoU for every candidate, and the non-overlapping set kept by the dynamic programme.">
 
@@ -59,57 +59,57 @@ from the probability map to the kept instances; every outline, node and score in
 <thead>
 <tr>
 <th width="150" align="left">Stage</th>
-<th width="330" align="left">What it does</th>
-<th width="220" align="left">Stored output</th>
-<th width="130" align="left">Notebook switch</th>
+<th width="300" align="left">What it does</th>
+<th width="226" align="left">Stored output</th>
+<th width="162" align="left">Notebook switch</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td valign="top"><b>1 · Dense maps</b><br><sub><code>dense_maps.py</code></sub></td>
-<td valign="top">10 U-Nets x 8 dihedral views at 2048 px. Out-of-fold maps for training images, 10-model mean for test images; view-uncertainty and family-gap maps.</td>
+<td valign="top">10 U-Nets x 8 dihedral views at 2048 px. Out-of-fold maps for training images, 10-model mean for test images; view-uncertainty and family-gap maps.<br><sub>Input: images, U-Net weights</sub></td>
 <td valign="top"><sub><code>{oof,test}_probs_unet.npz</code><br><code>{oof,test}_unc_unet.npz</code><br><code>{oof,test}_fam_unet.npz</code></sub></td>
 <td valign="top"><sub><code>RECOMPUTE_MAPS</code></sub></td>
 </tr>
 <tr>
 <td valign="top"><b>2 · Component tree</b><br><sub><code>candidates.py</code></sub></td>
-<td valign="top">Components at 8 thresholds, the tree that links them, 33 descriptors, targets from the training annotations.</td>
+<td valign="top">Components at 8 thresholds, the tree that links them, 33 descriptors, targets from the training annotations.<br><sub>Input: maps, images, annotations</sub></td>
 <td valign="top"><sub><code>candidates_{oof,test}.tbl.npz</code><br><code>test_components.npz</code><br><code>ngt_train.json</code></sub></td>
 <td valign="top"><sub><code>RECOMPUTE_CANDIDATES</code></sub></td>
 </tr>
 <tr>
 <td valign="top"><b>3 · CNN scorer</b><br><sub><code>cnn_scorer.py</code></sub></td>
-<td valign="top">ResNet18 on 4-channel crops, 5-fold cross-fitted, predicts the matched IoU of a candidate.</td>
+<td valign="top">ResNet18 on 4-channel crops, 5-fold cross-fitted, predicts the matched IoU of a candidate.<br><sub>Input: candidates, maps, images</sub></td>
 <td valign="top"><sub><code>cnn_scores_{oof,test}.csv.gz</code><br><code>cnn_scorer_f{0-4}.pt</code></sub></td>
 <td valign="top"><sub><code>RETRAIN_CNN_SCORER</code><br><code>APPLY_STORED_CNN_WEIGHTS</code></sub></td>
 </tr>
 <tr>
 <td valign="top"><b>4a · Detectors</b><br><sub><code>detector_evidence.py</code></sub></td>
-<td valign="top">Instances of 4 detector families x 5 fold models.</td>
+<td valign="top">Instances of 4 detector families x 5 fold models.<br><sub>Input: images, detector weights</sub></td>
 <td valign="top"><sub><code>detector_instances_{oof,test}.csv.gz</code></sub></td>
 <td valign="top"><sub><code>RECOMPUTE_DETECTIONS</code></sub></td>
 </tr>
 <tr>
 <td valign="top"><b>4b · Evidence</b><br><sub><code>detector_evidence.py</code></sub></td>
-<td valign="top">Per candidate: IoU, confidence, coverage and count with respect to the detector instances.</td>
+<td valign="top">Per candidate: IoU, confidence, coverage and count with respect to the detector instances.<br><sub>Input: instances, candidates</sub></td>
 <td valign="top"><sub><code>evidence_{oof,test}.csv.gz</code></sub></td>
 <td valign="top"><sub><code>RECOMPUTE_EVIDENCE</code></sub></td>
 </tr>
 <tr>
 <td valign="top"><b>5 · Hurdle LightGBM</b><br><sub><code>lgbm_scorer.py</code></sub></td>
-<td valign="top">Hit probability x matched IoU from 52 inputs; cross-fitted scores for the evaluation.</td>
+<td valign="top">Hit probability x matched IoU from 52 inputs; cross-fitted scores for the evaluation.<br><sub>Input: all of the above</sub></td>
 <td valign="top"><sub><code>lgbm_hit.txt</code>, <code>lgbm_iou.txt</code><br><code>oof_scores.csv.gz</code></sub></td>
 <td valign="top"><sub><code>REFIT_LGBM</code></sub></td>
 </tr>
 <tr>
 <td valign="top"><b>6 · Selection</b><br><sub><code>selection.py</code></sub></td>
-<td valign="top">Antichain dynamic programme, run-length encoding, validation of the submission.</td>
+<td valign="top">Antichain dynamic programme, run-length encoding, validation of the submission.<br><sub>Input: scores, component images</sub></td>
 <td valign="top"><sub><code>submission.csv</code></sub></td>
 <td valign="top"><sub>none</sub></td>
 </tr>
 <tr>
 <td valign="top"><b>7 · Evaluation</b><br><sub><code>evaluation.py</code><br><code>visualize.py</code></sub></td>
-<td valign="top">PQ, IoU and Dice distributions, one-to-many and many-to-one relations on the out-of-fold predictions; pictures.</td>
+<td valign="top">PQ, IoU and Dice distributions, one-to-many and many-to-one relations on the out-of-fold predictions; pictures.<br><sub>Input: selection, annotations</sub></td>
 <td valign="top"><sub>figures and tables of the notebook</sub></td>
 <td valign="top"><sub>none</sub></td>
 </tr>
@@ -259,9 +259,9 @@ notebook show the pictures and the evaluation. The repository contains no compet
 <table>
 <thead>
 <tr>
-<th width="200" align="left">Model</th>
-<th width="270" align="left">Where</th>
-<th width="360" align="left">How the notebook uses it</th>
+<th width="180" align="left">Model</th>
+<th width="310" align="left">Where</th>
+<th width="348" align="left">How the notebook uses it</th>
 </tr>
 </thead>
 <tbody>
@@ -277,12 +277,12 @@ notebook show the pictures and the evaluation. The repository contains no compet
 </tr>
 <tr>
 <td valign="top"><b>Dense U-Nets</b><br><sub>third party, CC BY-NC-SA 4.0</sub></td>
-<td valign="top">Not redistributed. Public Kaggle dataset <sub><code>dariushafshar/solar-filament-unet-weights</code></sub></td>
+<td valign="top">Not redistributed; public Kaggle dataset<br><sub><code>dariushafshar/solar-filament-unet-weights</code></sub></td>
 <td valign="top">Their stored maps are read by default. <code>RECOMPUTE_MAPS = True</code> re-runs them from the dataset.</td>
 </tr>
 <tr>
 <td valign="top"><b>Detectors</b><br><sub>third party, AGPL-3.0</sub></td>
-<td valign="top">Not redistributed. Public Kaggle dataset <sub><code>notoverkil/solar-filament-weights</code></sub></td>
+<td valign="top">Not redistributed; public Kaggle dataset<br><sub><code>notoverkil/solar-filament-weights</code></sub></td>
 <td valign="top">Their stored instances are read by default. <code>RECOMPUTE_DETECTIONS = True</code> re-runs them from the dataset.</td>
 </tr>
 </tbody>
@@ -298,9 +298,9 @@ datasets are described in [`THIRD_PARTY.md`](THIRD_PARTY.md).
 <table>
 <thead>
 <tr>
-<th width="380" align="left">Path</th>
-<th width="210" align="left">Hardware</th>
-<th width="240" align="left">Time</th>
+<th width="318" align="left">Path</th>
+<th width="200" align="left">Hardware</th>
+<th width="320" align="left">Time</th>
 </tr>
 </thead>
 <tbody>
@@ -420,8 +420,10 @@ Every figure of this page is drawn from the stored artefacts by a script in `too
 python tools/readme_media/build_all.py
 ```
 
-The figures use model outputs only (probability maps, component images, candidate tables, the reference submission) and
-the evaluation numbers listed in `tools/readme_media/numbers.json`.
+The scripts need only the files of this repository (about 8 minutes on 3 CPU cores). They use model outputs (probability
+maps, component images, candidate tables, the reference submission), for the out-of-fold curve the label-derived
+aggregates named under [Data, labels and licences](#data-labels-and-licences), and the evaluation numbers listed in
+`tools/readme_media/numbers.json`.
 
 </details>
 
@@ -438,7 +440,8 @@ The repository contains no competition image files, no annotation file, and no p
 executed notebook shows crops and one complete image of H-alpha test images with our predicted outlines (one crop in three
 figures, a gallery of eight crops, one complete image) and one training crop with the annotators' outlines (H-alpha images
 from the GONG network, NSO; MAGFiLO annotation outlines; CC BY-NC 4.0, non-commercial use, credit as in the data reference
-above). The figures of this page show model outputs only. Label-derived content is limited to: the columns `u`, `h`, `m`
+above). The figures of this page contain no image and no annotation; they are drawn from model outputs, from the
+label-derived aggregates named next and from evaluation numbers. Label-derived content is limited to: the columns `u`, `h`, `m`
 and `nann` of the training candidate table (`artifacts/candidates_oof.tbl.npz`: mean matched IoU, share of annotators with
 a match, mean IoU of the matching annotators and number of annotators, all aggregated over the annotators of an image) and
 the number of annotated masks per training image (`artifacts/ngt_train.json`). There are no annotator identifiers. Image

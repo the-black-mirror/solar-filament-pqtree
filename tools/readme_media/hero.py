@@ -22,7 +22,6 @@ Usage: ``python tools/readme_media/hero.py``; prints the chosen image and the te
 """
 from __future__ import annotations
 
-import html
 import json
 import math
 import sys
@@ -40,6 +39,7 @@ import pandas as pd  # noqa: E402
 from pycocotools import mask as mu  # noqa: E402
 
 import style  # noqa: E402
+from style import Label  # noqa: E402
 from pqtree.config import DISK_RADIUS, H, MIN_AREA, W  # noqa: E402
 
 # --- inputs -----------------------------------------------------------------------------------------------------------
@@ -72,9 +72,6 @@ PANEL_RIGHT = TEXT_X - MARGIN
 """Right edge of the free space of the disk panel."""
 
 # --- type -------------------------------------------------------------------------------------------------------------
-WIDTH_FACTOR = {"sans": 0.60, "bold": 0.64, "mono": 0.62}
-"""Budgeted advance width of one character as a share of the font size."""
-SLACK = 0.08
 ASCENT, DESCENT = 0.75, 0.25
 """Share of the font size above and below the baseline used for text boxes."""
 HUD_SIZE = 26
@@ -107,8 +104,6 @@ BREATHE_S = 8.0
 DIVIDER_W, DIVIDER_H, SEGMENT_W, DIVIDER_S = 1760, 24, 220, 6.0
 
 # --- graticule --------------------------------------------------------------------------------------------------------
-MERIDIANS = (-60, -30, 0, 30, 60)
-PARALLELS = (-60, -30, 0, 30, 60)
 GRATICULE_STEP = 2.0
 """Sampling step (degrees) of the graticule arcs."""
 JD_UNIX_EPOCH, JD_J2000 = 2440587.5, 2451545.0
@@ -234,44 +229,6 @@ def outline(mask: np.ndarray) -> Outline:
     return Outline(tuple(rings))
 
 
-def sphere_to_figure(lat: np.ndarray, lon: np.ndarray, b0: float) -> tuple[np.ndarray, np.ndarray]:
-    """Orthographic projection of heliographic (lat, lon) in degrees, disk centre at latitude ``b0``.
-
-    Returns the figure points (n, 2) and a boolean array that is True on the visible hemisphere.
-    """
-    la, lo, b = np.radians(lat), np.radians(lon), math.radians(b0)
-    x = np.cos(la) * np.sin(lo)
-    up = np.sin(la) * math.cos(b) - np.cos(la) * math.sin(b) * np.cos(lo)
-    depth = np.sin(la) * math.sin(b) + np.cos(la) * math.cos(b) * np.cos(lo)
-    points = np.round(np.stack([DISK_X + DISK_R * x, DISK_Y - DISK_R * up], axis=1), 1)
-    return points, depth > 0
-
-
-def visible_runs(points: np.ndarray, visible: np.ndarray) -> list[np.ndarray]:
-    """Consecutive visible stretches (at least two points) of a sampled curve."""
-    runs, start = [], None
-    for i, v in enumerate(list(visible) + [False]):
-        if v and start is None:
-            start = i
-        elif not v and start is not None:
-            if i - start >= 2:
-                runs.append(points[start:i])
-            start = None
-    return runs
-
-
-def graticule_path(b0: float) -> str:
-    """Path data of the meridians and parallels of the visible hemisphere."""
-    runs = []
-    lat = np.arange(-90.0, 90.0 + GRATICULE_STEP, GRATICULE_STEP)
-    lon = np.arange(-180.0, 180.0 + GRATICULE_STEP, GRATICULE_STEP)
-    for meridian in MERIDIANS:
-        runs += visible_runs(*sphere_to_figure(lat, np.full_like(lat, meridian), b0))
-    for parallel in PARALLELS:
-        runs += visible_runs(*sphere_to_figure(np.full_like(lon, parallel), lon, b0))
-    return " ".join(style.path_from_points(r, closed=False) for r in runs)
-
-
 def limb_ticks(step: int = 15, major: int = 90) -> tuple[str, str]:
     """Path data of the minor and the major position-angle ticks just outside the limb."""
     minor_d, major_d = [], []
@@ -286,44 +243,14 @@ def limb_ticks(step: int = 15, major: int = 90) -> tuple[str, str]:
 
 
 # --- text -------------------------------------------------------------------------------------------------------------
-@dataclass(frozen=True)
-class Label:
-    """One line of text with its budgeted width and the width available to it."""
+def coordinate(value: float) -> str:
+    """Coordinate attribute of the hero's text: always one decimal, like the other coordinates of this figure."""
+    return f"{value:.1f}"
 
-    text: str
-    x: float
-    y: float
-    size: int
-    face: str
-    colour: str
-    avail: float
-    spacing: float = 0.0
 
-    @property
-    def budget(self) -> float:
-        """Budgeted width without slack (figure pixels)."""
-        return len(self.text) * (self.size * WIDTH_FACTOR[self.face] + self.spacing)
-
-    @property
-    def fits(self) -> bool:
-        """True if the budget plus slack fits the available width."""
-        return self.budget * (1 + SLACK) <= self.avail
-
-    def box(self) -> tuple[float, float, float, float]:
-        """(x0, y0, x1, y1) of the budgeted text box, slack included."""
-        return (self.x, self.y - ASCENT * self.size, self.x + self.budget * (1 + SLACK),
-                self.y + DESCENT * self.size)
-
-    def svg(self) -> str:
-        """The SVG text element."""
-        attrs = f'x="{self.x:.1f}" y="{self.y:.1f}" font-size="{self.size}" fill="{self.colour}"'
-        if self.face == "mono":
-            attrs += f' font-family="{style.FONT_MONO}"'
-        if self.face == "bold":
-            attrs += ' font-weight="700"'
-        if self.spacing:
-            attrs += f' letter-spacing="{self.spacing:g}"'
-        return f"<text {attrs}>{html.escape(self.text, quote=False)}</text>\n"
+def text_box(label: Label) -> tuple[float, float, float, float]:
+    """(x0, y0, x1, y1) of the budgeted box of a left-aligned label, slack included."""
+    return label.x, label.y - ASCENT * label.size, label.x + label.budget, label.y + DESCENT * label.size
 
 
 def hud_available(x: float, y: float, size: int) -> float:
@@ -341,7 +268,7 @@ def hud_labels(stem: str, n_kept: int) -> list[Label]:
     when = observation_time(stem).strftime("%Y-%m-%d %H:%M UT")
     lines = [(HUD_TOP_Y, when, style.MUTED), (HUD_TOP_Y + HUD_STEP, f"{n_kept} filaments kept", style.GREEN),
              (HUD_BOTTOM_Y, "GONG H-alpha", style.MUTED), (HUD_BOTTOM_Y + HUD_STEP, f"{W} x {H}", style.MUTED)]
-    return [Label(text, MARGIN, y, HUD_SIZE, "mono", colour, hud_available(MARGIN, y, HUD_SIZE))
+    return [Label(text, MARGIN, y, HUD_SIZE, hud_available(MARGIN, y, HUD_SIZE), colour, mono=True)
             for y, text, colour in lines]
 
 
@@ -358,17 +285,17 @@ def tile_specs(numbers: dict) -> list[tuple[str, tuple[str, str]]]:
 def text_block_labels(numbers: dict) -> list[Label]:
     """Eyebrow, title, subtitle and the text of the stat tiles."""
     width = TEXT_RIGHT - TEXT_X
-    labels = [Label("SOLAR FILAMENT SEGMENTATION CHALLENGE 2026", TEXT_X, EYEBROW_Y, EYEBROW_SIZE, "mono",
-                    style.SUN, width, EYEBROW_SPACING)]
-    labels += [Label(t, TEXT_X, y, TITLE_SIZE, "bold", style.TEXT, width)
+    labels = [Label("SOLAR FILAMENT SEGMENTATION CHALLENGE 2026", TEXT_X, EYEBROW_Y, EYEBROW_SIZE, width, style.SUN,
+                    mono=True, spacing=EYEBROW_SPACING)]
+    labels += [Label(t, TEXT_X, y, TITLE_SIZE, width, style.TEXT, bold=True)
                for t, y in zip(("Solar filament", "instance segmentation"), TITLE_Y)]
-    labels += [Label(t, TEXT_X, y, SUBTITLE_SIZE, "sans", style.MUTED, width)
+    labels += [Label(t, TEXT_X, y, SUBTITLE_SIZE, width, style.MUTED)
                for t, y in zip(("Panoptic-quality-optimal selection", "on a component tree"), SUBTITLE_Y)]
     inner = TILE_W - 2 * TILE_PAD
     for i, (value, lines) in enumerate(tile_specs(numbers)):
         x = TEXT_X + i * (TILE_W + TILE_GAP) + TILE_PAD
-        labels.append(Label(value, x, TILE_Y + VALUE_DY, VALUE_SIZE, "mono", style.TEXT, inner))
-        labels += [Label(t, x, TILE_Y + dy, LABEL_SIZE, "sans", style.MUTED, inner) for t, dy in zip(lines, LABEL_DY)]
+        labels.append(Label(value, x, TILE_Y + VALUE_DY, VALUE_SIZE, inner, style.TEXT, mono=True))
+        labels += [Label(t, x, TILE_Y + dy, LABEL_SIZE, inner, style.MUTED) for t, dy in zip(lines, LABEL_DY)]
     return labels
 
 
@@ -408,28 +335,20 @@ def stars(avoid: list[tuple[float, float, float, float]]) -> list[tuple[float, f
     return out
 
 
-def gradient_stops(stops: list[tuple[float, str, float]]) -> str:
-    """<stop> elements from (offset, colour, opacity) triples."""
-    return "".join(f'<stop offset="{o:.3g}" stop-color="{c}"' + (f' stop-opacity="{a:g}"/>' if a < 1 else "/>")
-                   for o, c, a in stops)
-
-
 def hero_defs() -> str:
     """Gradients, clip paths and the fine glow of the hero, added to the shared definitions."""
     limb = DISK_R / (DISK_R + HALO_WIDTH)
     disk = f'cx="{DISK_X}" cy="{DISK_Y}"'
     horizontal = 'x1="0" y1="0" x2="1" y2="0"'
-    rim = style.blend(style.BG_SOFT, style.SUN, 0.12)
     return "\n".join([
         f'<radialGradient id="disk-fill" gradientUnits="userSpaceOnUse" {disk} r="{DISK_R}">'
-        + gradient_stops([(0, style.PANEL, 1), (0.82, style.BG_SOFT, 1), (1, rim, 1)]) + "</radialGradient>",
+        + style.gradient_stops(style.DISK_FILL_STOPS) + "</radialGradient>",
         f'<radialGradient id="disk-halo" gradientUnits="userSpaceOnUse" {disk} r="{DISK_R + HALO_WIDTH}">'
-        + gradient_stops([(limb, style.SUN, 0.24), ((limb + 1) / 2, style.SUN, 0.06), (1, style.SUN, 0)])
-        + "</radialGradient>",
+        + style.gradient_stops(style.halo_stops(limb)) + "</radialGradient>",
         f'<linearGradient id="beam-trail" {horizontal}>'
-        + gradient_stops([(0, style.CYAN, 0), (1, style.CYAN, 0.2)]) + "</linearGradient>",
+        + style.gradient_stops([(0, style.CYAN, 0), (1, style.CYAN, 0.2)]) + "</linearGradient>",
         f'<linearGradient id="glint-fill" {horizontal}>'
-        + gradient_stops([(0, style.TEXT, 0), (0.5, style.TEXT, 0.9), (1, style.TEXT, 0)]) + "</linearGradient>",
+        + style.gradient_stops([(0, style.TEXT, 0), (0.5, style.TEXT, 0.9), (1, style.TEXT, 0)]) + "</linearGradient>",
         f'<clipPath id="disk-clip"><circle {disk} r="{DISK_R}"/></clipPath>',
         f'<clipPath id="rule-clip"><rect x="{TEXT_X}" y="{RULE_Y}" width="{TILE_W:g}" height="{RULE_H}"/></clipPath>',
         '<filter id="glow-fine" x="-50%" y="-50%" width="200%" height="200%">'
@@ -477,9 +396,10 @@ def hero_css(outlines: list[Outline]) -> str:
 def disk_layer(b0: float) -> str:
     """Halo, disk, graticule, position-angle ticks and limb."""
     minor, major = limb_ticks()
+    graticule = style.graticule_path((DISK_X, DISK_Y), DISK_R, b0, GRATICULE_STEP)
     return (f'<circle cx="{DISK_X}" cy="{DISK_Y}" r="{DISK_R + HALO_WIDTH}" fill="url(#disk-halo)"/>\n'
             f'<circle cx="{DISK_X}" cy="{DISK_Y}" r="{DISK_R}" fill="url(#disk-fill)"/>\n'
-            f'<path d="{graticule_path(b0)}" fill="none" stroke="{style.PANEL_EDGE}" stroke-width="1.2"/>\n'
+            f'<path d="{graticule}" fill="none" stroke="{style.PANEL_EDGE}" stroke-width="1.2"/>\n'
             f'<path d="{minor}" stroke="{style.PANEL_EDGE}" stroke-width="1.5"/>\n'
             f'<path d="{major}" stroke="{style.SLATE}" stroke-width="1.5"/>\n'
             f'<circle cx="{DISK_X}" cy="{DISK_Y}" r="{DISK_R}" fill="none" stroke="{style.SUN}" stroke-width="1.6" '
@@ -527,11 +447,12 @@ def text_block_shapes() -> str:
     return "".join(out)
 
 
-def build_hero(stem: str, outlines: list[Outline], numbers: dict) -> tuple[str, list[Label]]:
-    """The hero SVG and the list of its text labels."""
+def build_hero(stem: str, outlines: list[Outline], numbers: dict) -> tuple[str, style.TextLayer]:
+    """The hero SVG and the text layer that holds its labels."""
     b0 = disk_centre_latitude(observation_time(stem))
     hud = hud_labels(stem, len(outlines))
-    labels = hud + text_block_labels(numbers)
+    layer = style.TextLayer(coord=coordinate)
+    text = "".join(layer.add(label) for label in hud + text_block_labels(numbers))
     final, counts = numbers["ablation"][-1], numbers["counts"]
     description = (f"Full-disk view of test image {stem} with the outlines of the {len(outlines)} filament "
                    f"instances kept by the model. Out-of-fold PQ {final['oof_pq']:.4f}, public leaderboard "
@@ -539,9 +460,9 @@ def build_hero(stem: str, outlines: list[Outline], numbers: dict) -> tuple[str, 
                    f"test images, reproduction on CPU in about {CPU_RUNTIME}.")
     parts = [style.svg_open(FIG_W, FIG_H, "Solar filament instance segmentation", description),
              style.svg_defs(hero_defs()), hero_css(outlines), style.svg_background(FIG_W, FIG_H),
-             star_layer(stars([lab.box() for lab in hud])), disk_layer(b0), beam_layer(), filament_layer(outlines),
-             text_block_shapes(), "".join(lab.svg() for lab in labels), "</svg>\n"]
-    return "".join(parts), labels
+             star_layer(stars([text_box(label) for label in hud])), disk_layer(b0), beam_layer(),
+             filament_layer(outlines), text_block_shapes(), text, "</svg>\n"]
+    return "".join(parts), layer
 
 
 # --- divider ----------------------------------------------------------------------------------------------------------
@@ -549,9 +470,7 @@ def build_divider() -> str:
     """Transparent hairline with a travelling orange-to-cyan segment; at rest the segment sits in the middle."""
     x_rest = (DIVIDER_W - SEGMENT_W) / 2
     y = DIVIDER_H / 2
-    stops = (f'<stop offset="0" stop-color="{style.SUN}" stop-opacity="0"/>'
-             f'<stop offset="0.3" stop-color="{style.SUN}"/><stop offset="0.85" stop-color="{style.CYAN}"/>'
-             f'<stop offset="1" stop-color="{style.CYAN}" stop-opacity="0"/>')
+    stops = style.gradient_stops([(0, style.SUN, 0), (0.3, style.SUN, 1), (0.85, style.CYAN, 1), (1, style.CYAN, 0)])
     css = (f".run {{ animation: run {DIVIDER_S:g}s cubic-bezier(0.65, 0, 0.35, 1) infinite; }}\n"
            f"@keyframes run {{ 0% {{ transform: translateX({-(x_rest + SEGMENT_W):g}px); }} "
            f"100% {{ transform: translateX({DIVIDER_W - x_rest:g}px); }} }}\n{style.REDUCED_MOTION_CSS}")
@@ -565,15 +484,7 @@ def build_divider() -> str:
               f'fill="url(#segment)"/>\n</svg>\n')
 
 
-# --- report -----------------------------------------------------------------------------------------------------------
-def print_budget(labels: list[Label]) -> None:
-    """Table of every label: font, size, budgeted width (slack included) and available width."""
-    print(f"{'text':<44} {'face':<5} {'size':>4} {'budget':>7} {'avail':>7}  fits")
-    for lab in labels:
-        print(f"{lab.text:<44} {lab.face:<5} {lab.size:>4} {lab.budget * (1 + SLACK):>7.1f} {lab.avail:>7.1f}  "
-              f"{'yes' if lab.fits else 'NO'}")
-
-
+# --- main -------------------------------------------------------------------------------------------------------------
 def main() -> None:
     """Pick the image, build both figures, print the budget and write the files."""
     numbers = json.loads(NUMBERS.read_text())
@@ -583,10 +494,8 @@ def main() -> None:
     quadrants, rms = centroid_spread(centroids(masks))
     print(f"image {stem}: {len(outlines)} instances, {quadrants} quadrants, spread {rms:.3f} disk radii, "
           f"B0 {disk_centre_latitude(observation_time(stem)):+.2f} deg")
-    hero, labels = build_hero(stem, outlines, numbers)
-    print_budget(labels)
-    if not all(lab.fits for lab in labels):
-        raise SystemExit("text overflow")
+    hero, layer = build_hero(stem, outlines, numbers)
+    layer.report()
     for name, text in (("hero.svg", hero), ("divider.svg", build_divider())):
         print(f"wrote docs/media/{name}: {style.write_text(style.MEDIA / name, text)} bytes")
 

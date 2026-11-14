@@ -4,7 +4,8 @@ Six stage cards, connected in the order in which the package runs them, between 
 image) and an output chip (the run-length-encoded instance masks). The small pictures in the two chips and in four of
 the cards are computed from one component tree of the test set, picked by a fixed rule (:func:`choose_tree`):
 
-* input chip: the 2048 x 2048 frame with the solar disk and the position of the crop that the other pictures show;
+* input chip: the 2048 x 2048 frame with the solar disk, drawn like the one of the hero banner, and the position of the
+  crop that the other pictures show;
 * stage 1: the stored test probability map on that crop, averaged over a 30 x 8 grid (``test_probs_unet.npz``);
 * stages 2 and 6: the component tree itself (``candidates_test.tbl.npz``), coloured by threshold level in stage 2 and by
   the decision of the stored hurdle model followed by the antichain selection at ``config.TAU`` in stage 6;
@@ -24,7 +25,7 @@ the pictures breathe slightly. Text never moves, and every element is complete i
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Sequence
 from xml.sax.saxutils import escape
@@ -38,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import style  # noqa: E402
+from style import TextLayer, num  # noqa: E402
 from pqtree import dense_maps, lgbm_scorer, pipeline, selection  # noqa: E402
 from pqtree.artifacts import fetch_artifact  # noqa: E402
 from pqtree.config import (CANDIDATE_FEATURES, CNN_CONFIG, DISK_RADIUS, FAMILIES, LEVELS, MODEL_FEATURES,  # noqa: E402
@@ -72,6 +74,10 @@ PICTO_GAP = 16
 ICON_TOP = 58
 DISK_ICON_H, RUNS_ICON_H = 104, 80
 """Heights of the input-chip icon (two text lines below it) and of the output-chip icon (three lines)."""
+DISK_ICON_GLOW = 6.0
+"""Width of the glow outside the limb of the input-chip disk (the hero's glow scaled to the smaller disk)."""
+DISK_ICON_GRATICULE_STEP = 5.0
+"""Sampling step (degrees) of the graticule arcs of the input-chip disk."""
 ICON_TO_LINE = 41
 """Distance from the lower edge of a chip icon to the first text baseline."""
 
@@ -94,10 +100,6 @@ HIGHLIGHT_STEP_S = 1.3
 """Time between the highlights of two consecutive tiles; eight tiles give one pass of 10.4 s."""
 FLOW_PERIOD_PX, FLOW_DASH_PX, FLOW_S = 16, 6, 1.2
 BREATHE_S, BREATHE_PHASE_S = 6.0, 0.75
-
-TEXT_SLACK = 1.08
-WIDTH_FACTOR = {(False, False): 0.60, (False, True): 0.64, (True, False): 0.62, (True, True): 0.62}
-"""Budget width of one character in units of the font size, keyed by (mono, bold)."""
 
 Picture = Callable[[float, float], str]
 """Draws a picture into the box whose top-left corner is given."""
@@ -142,47 +144,6 @@ def check_facts() -> None:
     wrong = [k for k, ok in checks.items() if not ok]
     if wrong:
         raise ValueError(f"card facts disagree with pqtree.config: {wrong}")
-
-
-# ---------------------------------------------------------------------------------------------------------------------
-# text with width budgets
-# ---------------------------------------------------------------------------------------------------------------------
-def num(v: float) -> str:
-    """Coordinate with at most one decimal and no trailing zero."""
-    s = f"{v:.1f}"
-    return s[:-2] if s.endswith(".0") else s
-
-
-def budget_width(text: str, size: float, mono: bool, bold: bool, spacing: float) -> float:
-    """Width the text may need: characters x (font size x factor + letter-spacing), plus the slack."""
-    return len(text) * (size * WIDTH_FACTOR[(mono, bold)] + spacing) * TEXT_SLACK
-
-
-@dataclass
-class TextLayer:
-    """Builds the text elements of a figure and keeps the width budget of each one."""
-    rows: list[tuple[str, float, float, float]] = field(default_factory=list)
-
-    def text(self, s: str, x: float, y: float, size: float, room: float, fill: str, *, mono: bool = False,
-             bold: bool = False, spacing: float = 0.0) -> str:
-        """Left-aligned ``<text>`` element; ``room`` is the free width to its right."""
-        if size < style.MIN_FONT_PX:
-            raise ValueError(f"font size {size} below {style.MIN_FONT_PX}: {s!r}")
-        self.rows.append((s, size, budget_width(s, size, mono, bold, spacing), room))
-        attrs = f' font-family="{style.FONT_MONO}"' if mono else ""
-        attrs += ' font-weight="700"' if bold else ""
-        attrs += f' letter-spacing="{num(spacing)}"' if spacing else ""
-        return f'<text x="{num(x)}" y="{num(y)}" font-size="{num(size)}" fill="{fill}"{attrs}>{escape(s)}</text>\n'
-
-    def report(self) -> None:
-        """Print the budget table and raise if any text needs more width than it has."""
-        print(f"{'text':<36} {'px':>4} {'budget':>8} {'room':>8}")
-        for s, size, need, room in self.rows:
-            flag = "  OVERFLOW" if need > room else ""
-            print(f"{s[:36]:<36} {size:>4.0f} {need:>8.1f} {room:>8.1f}{flag}")
-        over = [r[0] for r in self.rows if r[2] > r[3]]
-        if over:
-            raise ValueError(f"text wider than its box: {over}")
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -345,6 +306,7 @@ def tree_positions(nodes: pd.DataFrame, bx: float, by: float) -> dict[tuple[int,
     leaves: list = []
 
     def place(key: tuple[int, int]) -> float:
+        """Row of node ``key``: the next free row for a leaf, the mean row of its children otherwise."""
         kids = children.get(key, [])
         if kids:
             rows[key] = float(np.mean([place(k) for k in kids]))
@@ -451,15 +413,29 @@ def hurdle_picture(bx: float, by: float) -> str:
 
 
 def disk_icon(crop: tuple[int, int, int, int], bx: float, by: float) -> str:
-    """Input chip: the image frame, the solar disk and a marker on the crop that the card pictures show."""
+    """Input chip: the image frame, the solar disk and a marker on the crop that the card pictures show.
+
+    The disk is drawn like the one of the hero banner (dark disk, soft glow, faint graticule, thin orange limb); at this
+    size the graticule is shown with the solar equator through the centre. The two gradients of the disk are defined
+    here, so that the icon is self-contained.
+    """
     s = DISK_ICON_H / W
     x0, y0, x1, y1 = crop
+    cx, cy, r = bx + DISK_ICON_H / 2, by + DISK_ICON_H / 2, DISK_RADIUS * s
     mx, my = bx + (x0 + x1) / 2 * s, by + (y0 + y1) / 2 * s
-    return (f'<rect x="{num(bx)}" y="{num(by)}" width="{DISK_ICON_H}" height="{DISK_ICON_H}" rx="4" '
-            f'fill="{style.BG}" '
+    centre = f'cx="{num(cx)}" cy="{num(cy)}"'
+    halo = style.gradient_stops(style.halo_stops(r / (r + DISK_ICON_GLOW)))
+    fill = style.gradient_stops(style.DISK_FILL_STOPS)
+    graticule = style.graticule_path((cx, cy), r, b0=0.0, step=DISK_ICON_GRATICULE_STEP)
+    return (f'<rect x="{num(bx)}" y="{num(by)}" width="{DISK_ICON_H}" height="{DISK_ICON_H}" rx="4" fill="{style.BG}" '
             f'stroke="{style.PANEL_EDGE}" stroke-width="1.2"/>\n'
-            f'<circle cx="{num(bx + DISK_ICON_H / 2)}" cy="{num(by + DISK_ICON_H / 2)}" r="{num(DISK_RADIUS * s)}" '
-            'fill="url(#sun)"/>\n'
+            f'<defs><radialGradient id="disk-halo">{halo}</radialGradient>'
+            f'<radialGradient id="disk-fill">{fill}</radialGradient></defs>\n'
+            f'<circle {centre} r="{num(r + DISK_ICON_GLOW)}" fill="url(#disk-halo)"/>\n'
+            f'<circle {centre} r="{num(r)}" fill="url(#disk-fill)"/>\n'
+            f'<path d="{graticule}" fill="none" stroke="{style.PANEL_EDGE}" stroke-width="1"/>\n'
+            f'<circle {centre} r="{num(r)}" fill="none" stroke="{style.SUN}" stroke-width="1.2" '
+            'stroke-opacity="0.9"/>\n'
             f'<rect x="{num(bx + x0 * s)}" y="{num(by + y0 * s)}" width="{num((x1 - x0) * s)}" '
             f'height="{num((y1 - y0) * s)}" fill="none" stroke="{style.CYAN}" stroke-width="1.4"/>\n'
             f'<circle cx="{num(mx)}" cy="{num(my)}" r="10" fill="none" stroke="{style.TEXT}" stroke-opacity="0.75" '

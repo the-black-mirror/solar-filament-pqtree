@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import dataclass, field
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -28,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import style  # noqa: E402
+from style import TextLayer, num, text_budget  # noqa: E402
 
 NUMBERS_PATH = Path(__file__).resolve().parent / "numbers.json"
 OUT_PATH = style.MEDIA / "results.svg"
@@ -80,53 +80,6 @@ GROW_S, FADE_S = 1.5, 0.6
 EASE = "cubic-bezier(0.22, 0.8, 0.24, 1)"
 SHIMMER_W, SHIMMER_S, SHIMMER_DELAY_S = 140, 4.8, 1.8
 
-TEXT_SLACK = 1.08
-WIDTH_FACTOR = {(False, False): 0.60, (False, True): 0.64, (True, False): 0.62, (True, True): 0.62}
-"""Budget width of one character in units of the font size, keyed by (mono, bold)."""
-
-
-# ---------------------------------------------------------------------------------------------------------------------
-# text with width budgets
-# ---------------------------------------------------------------------------------------------------------------------
-def num(v: float) -> str:
-    """Coordinate with at most one decimal and no trailing zero."""
-    s = f"{v:.1f}"
-    return s[:-2] if s.endswith(".0") else s
-
-
-def budget_width(text: str, size: float, mono: bool, bold: bool, spacing: float) -> float:
-    """Width the text may need: characters x (font size x factor + letter-spacing), plus the slack."""
-    return len(text) * (size * WIDTH_FACTOR[(mono, bold)] + spacing) * TEXT_SLACK
-
-
-@dataclass
-class TextLayer:
-    """Builds the text elements of a figure and keeps the width budget of each one."""
-    rows: list[tuple[str, float, float, float]] = field(default_factory=list)
-
-    def text(self, s: str, x: float, y: float, size: float, room: float, fill: str, *, mono: bool = False,
-             bold: bool = False, spacing: float = 0.0, anchor: str = "start", cls: str = "") -> str:
-        """``<text>`` element; ``room`` is the width available around the anchor point."""
-        if size < style.MIN_FONT_PX:
-            raise ValueError(f"font size {size} below {style.MIN_FONT_PX}: {s!r}")
-        self.rows.append((s, size, budget_width(s, size, mono, bold, spacing), room))
-        attrs = f' font-family="{style.FONT_MONO}"' if mono else ""
-        attrs += ' font-weight="700"' if bold else ""
-        attrs += f' letter-spacing="{num(spacing)}"' if spacing else ""
-        attrs += f' text-anchor="{anchor}"' if anchor != "start" else ""
-        attrs += f' class="{cls}"' if cls else ""
-        return f'<text x="{num(x)}" y="{num(y)}" font-size="{num(size)}" fill="{fill}"{attrs}>{escape(s)}</text>\n'
-
-    def report(self) -> None:
-        """Print the budget table and raise if any text needs more width than it has."""
-        print(f"{'text':<44} {'px':>4} {'budget':>8} {'room':>8}")
-        for s, size, need, room in self.rows:
-            flag = "  OVERFLOW" if need > room else ""
-            print(f"{s[:44]:<44} {size:>4.0f} {need:>8.1f} {room:>8.1f}{flag}")
-        over = [r[0] for r in self.rows if r[2] > r[3]]
-        if over:
-            raise ValueError(f"text wider than its box: {over}")
-
 
 def wrap_phrases(text: str, size: float, room: float, bold: bool) -> list[str]:
     """Split ``text`` after its commas and pack the phrases greedily into lines that fit ``room``."""
@@ -135,7 +88,7 @@ def wrap_phrases(text: str, size: float, room: float, bold: bool) -> list[str]:
     lines = [phrases[0]]
     for p in phrases[1:]:
         candidate = f"{lines[-1]} {p}"
-        if budget_width(candidate, size, False, bold, 0) <= room:
+        if text_budget(candidate, size, bold=bold) <= room:
             lines[-1] = candidate
         else:
             lines.append(p)
@@ -222,13 +175,13 @@ def panel_ablation(layer: TextLayer, nums: dict) -> str:
                          f'width="{SHIMMER_W}" height="{BAR_H}" fill="url(#shimmer)" class="shimmer"/></g>\n')
         parts.append(layer.text(f"{entry['oof_pq']:.4f}", xv + VALUE_GAP, cy + CAP_TO_CENTRE, TEXT_PX,
                                 chip_x - 16 - xv - VALUE_GAP, style.GREEN if final else style.TEXT, mono=True,
-                                cls="fade d3"))
+                                css_class="fade d3"))
         parts.append(rect(chip_x, cy - CHIP_H / 2, CHIP_W, CHIP_H, style.BG_SOFT,
                           f' rx="{CHIP_H / 2:g}" stroke="{style.GREEN if final else style.PANEL_EDGE}" '
                           'stroke-width="1.5" class="fade d3"'))
         parts.append(layer.text(f"public {entry['public']:.2f}", chip_x + CHIP_PAD, cy + CAP_TO_CENTRE, TEXT_PX,
                                 CHIP_W - 2 * CHIP_PAD, style.GREEN if final else style.MUTED, mono=True,
-                                cls="fade d3"))
+                                css_class="fade d3"))
     return "".join(parts)
 
 
@@ -245,7 +198,7 @@ def panel_decomposition(layer: TextLayer, nums: dict) -> str:
     """(b) PQ = SQ x RQ for shuffle 0 and the segmented bar of TP, FP and FN."""
     s0 = nums["shuffle0"]
     width = B_RIGHT - B_LEFT
-    number_w = budget_width("0.0000", BIG_PX, True, False, 0)
+    number_w = text_budget("0.0000", BIG_PX, mono=True)
     op_w = (width - 3 * number_w) / 2
     parts = [title(layer, "PQ = SQ × RQ", B_LEFT, LOWER_TITLE_Y, width),
              layer.text("cross-fitting shuffle 0", B_LEFT, LOWER_SUB_Y, TEXT_PX, width, style.MUTED)]
@@ -253,7 +206,7 @@ def panel_decomposition(layer: TextLayer, nums: dict) -> str:
     for i, (name, value, colour) in enumerate(terms):
         x = B_LEFT + i * (number_w + op_w)
         parts.append(layer.text(f"{value:.4f}", x, B_NUMBER_Y, BIG_PX, number_w, colour, mono=True,
-                                cls=f"fade d{i}"))
+                                css_class=f"fade d{i}"))
         parts.append(layer.text(name, x, B_NAME_Y, TEXT_PX, number_w, style.MUTED, mono=True,
                                 spacing=EYEBROW_SPACING))
         if i < 2:
@@ -274,14 +227,15 @@ def panel_decomposition(layer: TextLayer, nums: dict) -> str:
     shares = [f"{100 * count / total:.1f} %" for _, count, _, _ in counts]
     for row_y, texts, fills in [(B_LABEL_Y, labels, [c[3] for c in counts]),
                                 (B_SHARE_Y, shares, [style.MUTED] * len(counts))]:
-        needs = [budget_width(t, TEXT_PX, True, False, 0) for t in texts]
+        needs = [text_budget(t, TEXT_PX, mono=True) for t in texts]
         mid = spans[1][0] + spans[1][1] / 2
         rooms = [mid - needs[1] / 2 - 12 - B_LEFT,
                  2 * min(mid - B_LEFT - needs[0] - 12, B_RIGHT - needs[2] - 12 - mid),
                  B_RIGHT - (mid + needs[1] / 2) - 12]
         anchors = [(B_LEFT, "start"), (mid, "middle"), (B_RIGHT, "end")]
         for text, fill, room, (ax, anchor) in zip(texts, fills, rooms, anchors):
-            parts.append(layer.text(text, ax, row_y, TEXT_PX, room, fill, mono=True, anchor=anchor, cls="fade d3"))
+            parts.append(layer.text(text, ax, row_y, TEXT_PX, room, fill, mono=True, anchor=anchor,
+                                    css_class="fade d3"))
     return "".join(parts)
 
 
@@ -301,15 +255,15 @@ def quantile_strip(layer: TextLayer, name: str, q: dict, cy: float, index: int) 
              f'stroke="{style.GREEN}" stroke-width="2" class="fade d3"/>\n',
              layer.text(name, C_LEFT, cy + CAP_TO_CENTRE, TEXT_PX, C_X0 - 16 - C_LEFT, style.TEXT, bold=True),
              layer.text(f"mean {q['mean']:.3f}", C_LEFT, cy + VALUE_DY, TEXT_PX, C_X0 - 16 - C_LEFT, style.TEXT,
-                        mono=True, cls="fade d3")]
-    half_value = budget_width("0.000", TEXT_PX, True, False, 0) / 2
+                        mono=True, css_class="fade d3")]
+    half_value = text_budget("0.000", TEXT_PX, mono=True) / 2
     first = min(max(xs["q50"] - 2 * VALUE_STEP, C_X0 + half_value), RIGHT - half_value - 4 * VALUE_STEP)
     for i, k in enumerate(keys):
         vx = first + i * VALUE_STEP
         parts.append(line(xs[k], cy + LEADER_TOP, vx, cy + LEADER_BOTTOM, style.MUTED, 1,
                           ' stroke-opacity="0.6" class="fade d3"'))
         parts.append(layer.text(f"{q[k]:.3f}", vx, cy + VALUE_DY, TEXT_PX, VALUE_STEP - 8, style.MUTED, mono=True,
-                                anchor="middle", cls="fade d3"))
+                                anchor="middle", css_class="fade d3"))
     return "".join(parts)
 
 
@@ -374,10 +328,8 @@ def description(nums: dict) -> str:
 def build_svg(nums: dict, layer: TextLayer) -> str:
     """The complete SVG document."""
     counts = nums["counts"]
-    gradient = (f'<linearGradient id="shimmer" x1="0" y1="0" x2="1" y2="0">'
-                f'<stop offset="0" stop-color="{style.TEXT}" stop-opacity="0"/>'
-                f'<stop offset="0.5" stop-color="{style.TEXT}" stop-opacity="0.45"/>'
-                f'<stop offset="1" stop-color="{style.TEXT}" stop-opacity="0"/></linearGradient>\n')
+    stops = style.gradient_stops([(0, style.TEXT, 0), (0.5, style.TEXT, 0.45), (1, style.TEXT, 0)])
+    gradient = f'<linearGradient id="shimmer" x1="0" y1="0" x2="1" y2="0">{stops}</linearGradient>\n'
     parts = [style.svg_open(WIDTH, HEIGHT, "Results", escape(description(nums))),
              style.svg_defs(gradient + final_bar_clip(nums)), css(nums),
              style.svg_background(WIDTH, HEIGHT),
