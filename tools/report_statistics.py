@@ -1,4 +1,4 @@
-"""Evaluation statistics of the technical report, recomputed from the repository.
+"""Evaluation statistics quoted in the technical report of this entry, recomputed from the repository.
 
 For one cross-fitting shuffle (default 0) and the final threshold ``config.TAU`` this script selects instances on the
 out-of-fold scores of the 707 training images, scores them against every annotator and prints

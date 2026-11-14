@@ -1,7 +1,8 @@
 # Third-party components and licences
 
-The code in this repository is released under the MIT licence (`LICENSE`). The stored artefacts in `artifacts/` are
-released under CC BY-NC-SA 4.0, the most restrictive licence among their inputs (see below). The repository uses the
+The code in this repository is released under the MIT licence (`LICENSE`). The stored artefacts in `artifacts/` and
+the figures in `docs/media/` drawn from them are released under CC BY-NC-SA 4.0, the most restrictive licence among their
+inputs (see below). The repository uses the
 following third-party material. No third-party model weights are copied into the repository; the stages that need them read
 them from their public Kaggle datasets.
 
@@ -9,7 +10,7 @@ them from their public Kaggle datasets.
 
 | source | author | use here |
 |---|---|---|
-| Kaggle notebook "Solar Filament Segmentation 2026 (0.40)", https://www.kaggle.com/code/tushhaaarrrr/solar-filament-segmentation-2026-0-40 | tushhaaarrrr | Source of the method description: the component tree of thresholded maps, the hurdle estimate of the expected matched IoU (hit probability x matched IoU), the exact antichain dynamic programme, and the single global threshold derived with Dinkelbach's argument. These were re-implemented here; the descriptors, the CNN scorer, the detector-agreement features and the code were written for this project. The idea of ensemble-disagreement descriptors also appears in that notebook; the implementation here (view-spread and encoder-gap maps) is ours. No code of that notebook is included: `pqtree/lgbm_scorer.py`, `pqtree/selection.py` and `pqtree/candidates.py` were written independently from its description (the notebook shows the dynamic programme only as a short illustration on a one-dimensional profile and does not contain the code of its scorer). |
+| Kaggle notebook "Solar Filament Segmentation 2026 (0.40)", https://www.kaggle.com/code/tushhaaarrrr/solar-filament-segmentation-2026-0-40 | tushhaaarrrr | Source of the method description: the component tree of thresholded maps, the hurdle estimate of the expected matched IoU (hit probability x matched IoU), the exact antichain dynamic programme, and the single global threshold derived with Dinkelbach's argument. These were re-implemented here; the descriptors, the CNN scorer, the detector-agreement features and the code were written for this project. The idea of ensemble-disagreement descriptors also appears in that notebook; the implementation here (view-spread and encoder-gap maps) is ours. No code of that notebook is included; `pqtree/lgbm_scorer.py`, `pqtree/selection.py` and `pqtree/candidates.py` implement the method from its description. |
 
 ## Model weights and data
 
@@ -41,4 +42,5 @@ them from their public Kaggle datasets.
   of the winning submission. The dense-map weights are non-commercial and the detector weights are AGPL-3.0, so the
   complete pipeline inherits those restrictions; the code in this repository does not.
 * The artefacts are intermediate results of the pipeline and the weights of our own CNN scorer and LightGBM models. They are
-  released together under CC BY-NC-SA 4.0 because they derive from non-commercial, share-alike inputs.
+  released together under CC BY-NC-SA 4.0 because they derive from non-commercial, share-alike inputs. The figures in
+  `docs/media/` show these results (probability maps, components, kept instances) and carry the same licence.

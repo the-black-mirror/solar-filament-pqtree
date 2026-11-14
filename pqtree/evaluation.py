@@ -5,8 +5,8 @@ unmatched predictions are false positives and unmatched ground-truth masks false
 PQ = sum(IoU of true positives) / (TP + FP/2 + FN/2). An image has several annotators; every annotator's masks are scored
 against the prediction separately and the counts are pooled over all (image, annotator) pairs.
 
-Besides PQ this module reports the quantities of the evaluation rubric: the distribution of IoU and Dice scores and the
-one-to-many / many-to-one relations between ground-truth and predicted masks.
+Besides PQ this module reports the distribution of IoU and Dice scores and the one-to-many / many-to-one relations
+between ground-truth and predicted masks.
 """
 from __future__ import annotations
 

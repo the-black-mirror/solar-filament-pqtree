@@ -1,0 +1,24 @@
+{
+  "source": "Evaluation statistics of the out-of-fold predictions on the 707 training images, as printed by notebooks/pipeline.ipynb (stage 7) and tools/report_statistics.py. Public scores are those displayed by the competition site.",
+  "ablation": [
+    {"label": "dense maps + plain keep rule", "oof_pq": 0.4523, "public": 0.39},
+    {"label": "+ component tree, hurdle LightGBM, CNN scorer", "oof_pq": 0.4570, "public": 0.39},
+    {"label": "+ detector evidence (final)", "oof_pq": 0.4625, "public": 0.41}
+  ],
+  "annotator_agreement_pq": 0.339,
+  "three_shuffle_pq_tau_034": [0.4608, 0.4628, 0.4640],
+  "shuffle0": {"pq": 0.4609, "sq": 0.6914, "rq": 0.6666, "tp": 4899, "fp": 1601, "fn": 3300},
+  "matched_pairs": {
+    "n": 4899,
+    "iou": {"mean": 0.691, "q10": 0.568, "q25": 0.630, "q50": 0.699, "q75": 0.758, "q90": 0.799},
+    "dice": {"mean": 0.814, "q10": 0.725, "q25": 0.773, "q50": 0.823, "q75": 0.862, "q90": 0.888}
+  },
+  "annotated_masks_with_match_share": 0.598,
+  "counts": {"training_images": 707, "image_annotator_pairs": 1154, "annotated_masks": 8199, "predictions": 6499,
+             "test_images": 180, "test_instances": 1010, "model_inputs": 52, "threshold_levels": 8},
+  "relations": {
+    "overlap": {"one_to_many": 140, "many_to_one": 137},
+    "half_area": {"one_to_many": 132, "many_to_one": 123}
+  },
+  "tau": 0.34
+}

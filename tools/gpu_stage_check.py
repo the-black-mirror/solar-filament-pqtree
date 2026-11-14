@@ -1,7 +1,7 @@
 """Check the packaged GPU stages against the stored results on six images (run it in a Kaggle GPU session).
 
-The dense maps (stage 1), the detector instances (stage 4a) and the CNN scorer (stage 3) were produced on Kaggle T4
-GPUs with the scripts that this package reorganises. GPU inference is not bit-reproducible, so the stored results are
+The dense maps (stage 1), the detector instances (stage 4a) and the CNN scorer (stage 3) were computed on Kaggle T4
+GPUs before the code was arranged as this package. GPU inference is not bit-reproducible, so the stored results are
 part of the repository. This script runs the packaged code on 3 test images and 3 training images (one per fold where
 possible) and compares with the stored results.
 
